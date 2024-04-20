@@ -1,0 +1,4 @@
+uvicorn
+fastapi
+singleton-decorator==1.0.0
+runpod >= 1.6.0
