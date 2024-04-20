@@ -1,8 +1,6 @@
 # your_handler.py
-import uvicorn
 from fastapi import FastAPI
-
-from socaity_router.sai_router import SocaityRouter
+from socaity_router import SocaityRouter
 
 # router = SocaityRouter(provider="runpod", environment="localhost")
 router = SocaityRouter(provider="fastapi", environment="localhost")

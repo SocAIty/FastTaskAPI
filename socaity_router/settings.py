@@ -1,7 +1,7 @@
 import sys
 from os import environ
 
-from CONSTS import EXECUTION_PROVIDERS, EXECUTION_ENVIRONMENTS
+from socaity_router.CONSTS import EXECUTION_PROVIDERS, EXECUTION_ENVIRONMENTS
 
 sys.argv.extend(['rp_serve_api', '1'])
 sys.argv.extend(['--rp_serve_api', '1'])

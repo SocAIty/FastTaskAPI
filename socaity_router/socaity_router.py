@@ -1,5 +1,5 @@
-from CONSTS import EXECUTION_PROVIDERS, EXECUTION_ENVIRONMENTS
-from settings import EXECUTION_PROVIDER, EXECUTION_ENVIRONMENT
+from socaity_router.CONSTS import EXECUTION_PROVIDERS, EXECUTION_ENVIRONMENTS
+from socaity_router.settings import EXECUTION_PROVIDER, EXECUTION_ENVIRONMENT
 from socaity_router.core.routers._SocaityRouter import _SocaityRouter
 from socaity_router.core.routers._runpod_router import SocaityRunpodRouter
 from socaity_router.core.routers._fastapi_router import SocaityFastAPIRouter

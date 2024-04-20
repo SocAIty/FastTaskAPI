@@ -1,7 +1,7 @@
 # SOCAITY ROUTER
 
 A router for AI services running anywhere, locally, hosted, serverless and decentralized.
-Plays well with existing providers like runpod and famous libaries like fastapi.
+Plays well with existing providers like runpod and famous libraries like fastapi.
 
 ### PACKAGE IS IN DEVELOPMENT
 We will release a pypi package as soon as the first version is stable.
@@ -51,12 +51,12 @@ SocaityRouter(provider="runpod")
 To deploy to runpod all you have to do is to write a simple docker file to deploy the service. 
 No custom handler writing is required.
 
-### Use the endpoints like a function with the socaity package.
+## Use the endpoints like a function with the socaity package.
 If you have the socaity package installed, you can use the endpoints like a function.
 This makes it insanely useful for complex scenarious where you use multiple models and endpoints.
 Socaity package release comes soon.
 
-### Jobs and Job Queues
+## Jobs and Job Queues
 
 If you have a long running task, you can use the job queue functionality. By default, the queue size is 100.
 ```python
@@ -70,7 +70,7 @@ What will happen now is:
 
 Note: in case of "runpod", "serverless" this is not necessary, as the job mechanism is handled by runpod deployment.
 
-#### Job status and progress bars
+### Job status and progress bars
 
 You can provide status updates by emiting a status update in the function. If then a client asks for the status of the
 task, he will get the messages and the process bar. This is for example in the socaity package used to provide a progress bar.
@@ -87,9 +87,16 @@ def predict(status: jobStatus, my_param1: str, my_param2: int = 0):
 ```
 When the return is finished, the job is marked as done and the progress bar is automatically set to 1.
 
-#### Run sync
+### Run sync
 If you want to run the endpoint sync, you can add ?sync=true to the endpoint, to wait for the result.
 Then the server will wait with a response until the job is finished.
+
+# Deploying a Service to production
+
+## Runpod
+It is not required to write a handler function anymore. The socaity router magic handles it :D
+Just write a simple docker file and deploy it to runpod. 
+
 
 ## Writing your own Router
 
