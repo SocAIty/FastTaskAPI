@@ -12,6 +12,7 @@ class JobResult(BaseModel):
     id: str
     status: Optional[str] = None
     progress: Optional[float] = 0.0
+    message: Optional[str] = None
     result: Optional[dict] = None
 
     created_at: Optional[str] = None
@@ -33,6 +34,8 @@ class JobResultFactory:
         return JobResult(
             id=ij.id,
             status=ij.status,
+            progress=ij.job_progress.progress,
+            message=ij.job_progress.message,
             result=ij.result,
             created_at=created_at,
             queued_at=queued_at,

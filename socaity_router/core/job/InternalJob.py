@@ -19,6 +19,21 @@ class PROVIDERS(Enum):
     REPLICATE = "replicate"
 
 
+class JobProgress:
+    def __init__(self, progress: float = 0, message: str = None):
+        """
+        Used to display progress of a job while executing.
+        :param progress: value between 0 and 1.0
+        :param message: message to deliver to client.
+        """
+        self.progress = progress
+        self.message = message
+
+    def set_status(self, progress: float, message: str):
+        self.progress = progress
+        self.message = message
+
+
 class InternalJob:
     def __init__(
             self,
@@ -38,7 +53,9 @@ class InternalJob:
         self.job_params: Union[dict, None] = job_params
 
         self.status: JOB_STATUS = JOB_STATUS.PENDING
-        self.progress = 0.0  # between 0 and 1
+
+        self.job_progress = JobProgress()
+
         self.result = None
 
         # timeout used to kill long running jobs in the queue
