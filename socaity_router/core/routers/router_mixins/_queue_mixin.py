@@ -2,7 +2,7 @@ import functools
 
 from socaity_router.CONSTS import SERVER_STATUS
 from socaity_router.core.JobQueue import JobQueue
-from socaity_router.core.JobResult import JobResultFactory, JobResult
+from socaity_router.core.job.JobResult import JobResultFactory, JobResult
 
 class _QueueMixin:
     """
@@ -38,6 +38,7 @@ class _QueueMixin:
             def job_creation_func_wrapper(*wrapped_func_args, **wrapped_func_kwargs) -> JobResult:
                 # combine args and kwargs
                 wrapped_func_kwargs.update(wrapped_func_args)
+                # create a job and add to the job queue
                 internal_job = self.job_queue.add_job(
                     job_function=func,
                     job_params=wrapped_func_kwargs

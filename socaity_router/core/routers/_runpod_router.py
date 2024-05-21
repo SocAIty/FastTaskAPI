@@ -1,8 +1,12 @@
 import functools
 import inspect
+from typing import Union
 
 from socaity_router.CONSTS import SERVER_STATUS
+from socaity_router.core.job.JobProgress import JobProgressRunpod, JobProgress
 from socaity_router.core.routers._SocaityRouter import _SocaityRouter
+
+from socaity_router.CONSTS import EXECUTION_ENVIRONMENTS
 
 
 class SocaityRunpodRouter(_SocaityRouter):
@@ -10,9 +14,11 @@ class SocaityRunpodRouter(_SocaityRouter):
     Adds routing functionality for the runpod serverless framework.
     The runpod_handler has an additional argument "path" which is the path to the function.
     Implementation is inspired by the fastapi router.
+    The router is a runpod handler that routes the path to the correct function.
+    All the runpod functionality is supported, jobs return an ID. Result can be fetched with the ID.
     """
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.routes = {}   # routes are organized like {"ROUTE_NAME": "ROUTE_FUNCTION"}
 
     def add_route(
@@ -43,13 +49,50 @@ class SocaityRunpodRouter(_SocaityRouter):
 
         return decorator
 
-    def _router(self, path, **kwargs):
+
+    def _add_job_progress_to_kwargs(self, func, job, kwargs):
+        """
+        If the function has a job_progress parameter, it is passed to the function normally.
+        The parameter changes the progress of the runpod job.
+        :param func: the function that is called
+        :param job: the runpod job
+        :param kwargs: the arguments that are passed to the function
+        :return: the arguments with the job_progress object added if necessary
+        """
+        # Therefore instead of initiating a normal JobProgress object a specialized RunpodProgress object is initiated.
+        # The RunpodProgress object has a reference to the runpopd job.
+
+        job_progress_params = []
+        for param in inspect.signature(func).parameters.values():
+            if param.annotation == JobProgress or param.name == "job_progress":
+                job_progress_params.append(param.name)
+
+        if len(job_progress_params) > 0:
+            jp = JobProgressRunpod(job)
+            for job_progress_param in job_progress_params:
+                kwargs[job_progress_param] = jp
+
+        return kwargs
+
+
+    def _router(self, path, job, **kwargs):
+        """
+        Internal router function that routes the path to the correct function.
+        :param path: the path (route) to the function
+        :param job: the runpod job (used for progress updates)
+        :param kwargs: arguments for the function behind the path
+        :return:
+        """
+
         if len(path) > 0 and path[0] == "/":
             path = path[1:]
 
         route_function = self.routes.get(path, None)
         if route_function is None:
             raise Exception(f"Route {path} not found")
+
+        # add the job_progress object to the function if necessary
+        kwargs = self._add_job_progress_to_kwargs(route_function, job, kwargs)
 
         # check the arguments for the path function
         sig = inspect.signature(route_function)
@@ -78,14 +121,20 @@ class SocaityRunpodRouter(_SocaityRouter):
         route = inputs["path"]
         del inputs["path"]
 
-        return self._router(route, **inputs)
+        return self._router(route, job, **inputs)
 
     def serverless_start(self):
         import runpod.serverless
         runpod.serverless.start({"handler": self.handler})
 
-    def start(self):
-        self.serverless_start()
+    def start(self, environment: Union[EXECUTION_ENVIRONMENTS, str] = EXECUTION_ENVIRONMENTS.SERVERLESS, port=8000):
+        if type(environment) is str:
+            environment = EXECUTION_ENVIRONMENTS(environment)
+
+        if environment == environment.SERVERLESS:
+            self.serverless_start()
+        else:
+            raise Exception(f"Not implemented for environment {environment}")
 
 
 

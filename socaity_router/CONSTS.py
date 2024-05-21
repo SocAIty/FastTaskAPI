@@ -6,9 +6,9 @@ class EXECUTION_PROVIDERS(Enum):
 class EXECUTION_ENVIRONMENTS(Enum):
     LOCALHOST = "localhost"
     HOSTED = "hosted"
+    SERVERLESS = "serverless"
 
-
-class SERVER_STATUS:
+class SERVER_STATUS(Enum):
     INITIALIZING = "initializing"
     BOOTING = "booting"
     RUNNING = "running"

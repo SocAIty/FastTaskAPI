@@ -3,9 +3,10 @@ from typing import Union
 from uuid import uuid4
 from enum import Enum
 
+from socaity_router.core.job.JobProgress import JobProgress
+
 
 class JOB_STATUS(Enum):
-    PENDING = "Pending"
     QUEUED = "Queued"
     PROCESSING = "Processing"
     FINISHED = "Finished"
@@ -17,21 +18,6 @@ class PROVIDERS(Enum):
     RUNPOD = "runpod"
     OPENAI = "openai"
     REPLICATE = "replicate"
-
-
-class JobProgress:
-    def __init__(self, progress: float = 0, message: str = None):
-        """
-        Used to display progress of a job while executing.
-        :param progress: value between 0 and 1.0
-        :param message: message to deliver to client.
-        """
-        self.progress = progress
-        self.message = message
-
-    def set_status(self, progress: float, message: str):
-        self.progress = progress
-        self.message = message
 
 
 class InternalJob:
@@ -52,7 +38,7 @@ class InternalJob:
         self.job_function = job_function
         self.job_params: Union[dict, None] = job_params
 
-        self.status: JOB_STATUS = JOB_STATUS.PENDING
+        self.status: JOB_STATUS = JOB_STATUS.QUEUED
 
         self.job_progress = JobProgress()
 

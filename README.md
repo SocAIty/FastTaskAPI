@@ -23,7 +23,7 @@ The syntax is oriented by the simplicity of fastapi. Other hazards are taken car
 - Routing functionality for serverless providers like [Runpod](Runpod.io)
 - Adding jobs, job queues for your service (no code required)
 - Providing async, sync and streaming functionality.
-- Neat less integration into the SOCAITY ecosystem for running services like python functions.
+- Neat less integration into the SOCAITY ecosystem for running ai services like python functions.
 - Monitoring server state.
 
 The code is fast, lightweight, pure python and meant to be flexible.
@@ -34,9 +34,13 @@ Just use the known syntax of fastapi to define your routes.
 ```python
 from socaity_router import SocaityRouter
 
+router = SocaityRouter(provider="runpod", environment="localhost")
+
 @SocaityRouter.add_route("/predict")
 def predict(my_param1: str, my_param2: int = 0):
     return "my_awesome_prediction"
+
+router.start()
 ```
 Set environment variables to determine the deployment target or provide the values in the constructor.
 Default is ```EXECUTION_ENVIORNMENT="localhost"``` and ```EXECUTION_PROVIDER="fastapi"```.
@@ -46,50 +50,77 @@ To deploy multiple methods for a serverless provider like Runpod simply set the 
 Or use the constructor to set the provider.
 
 ```python
-SocaityRouter(provider="runpod")
+SocaityRouter(provider="fastapi")
 ```
 To deploy to runpod all you have to do is to write a simple docker file to deploy the service. 
 No custom handler writing is required.
 
-## Use the endpoints like a function with the socaity package.
-If you have the socaity package installed, you can use the endpoints like a function.
-This makes it insanely useful for complex scenarious where you use multiple models and endpoints.
-Socaity package release comes soon.
 
-## Jobs and Job Queues
+## Jobs and job queues
 
 If you have a long running task, you can use the job queue functionality. By default, the queue size is 100.
 ```python
 @SocaityRouter.add_route("/predict", queue_size=100)
 def predict(my_param1: str, my_param2: int = 0):
+    time.sleep(10) # heavy computation
     return "my_awesome_prediction"
 ```
 What will happen now is: 
 - The method will return a "Job" object instead of the result, including a job id.
 - By calling the endpoint with predict?job_id=... or the "status" endpoint you can get the result / status of the job.
 
+
 Note: in case of "runpod", "serverless" this is not necessary, as the job mechanism is handled by runpod deployment.
+
+## Calling the endpoints -> Getting the job result
+
+You can call the endpoints with a simple http request.
+You can try them out in the browser, with curl or Postman. 
+For more convenience with the socaity package, you can use the endpoints like functions.
+
+ 
+
+
+
+
+## Use the endpoints like functions with the socaity package.
+If you have the socaity package installed, you can use the endpoints like a function.
+This makes it insanely useful for complex scenarious where you use multiple models and endpoints.
+Socaity package release comes soon.
+
+#### Async
+
+```python
+job = predict("my_param1", my_param2=2)
+result = job.result(
+
+```
+#### Run sync
+If you want to run the endpoint sync, you can add ?sync=true to the endpoint, to wait for the result.
+Then the server will wait with a response until the job is finished.
+
+
 
 ### Job status and progress bars
 
-You can provide status updates by emiting a status update in the function. If then a client asks for the status of the
-task, he will get the messages and the process bar. This is for example in the socaity package used to provide a progress bar.
-If you want to enable this functionality, add the jobStatus parameter to the function.
+You can provide status updates by changing the values of the job_progress object. 
+If you add a parameter named job_progress to the function we will pass that object to the function.
+If then a client asks for the status of the task, he will get the messages and the process bar. This is for example in the socaity package used to provide a progress bar.
+
 ```python
-@SocaityRouter.route("/predict", queue_size=10)
-def predict(status: jobStatus, my_param1: str, my_param2: int = 0):
-    
-    jobStatus.message = "I am working on it"
-    jobStatus.progress = 0.5
-    jobStatus.message = "Still working on it. Almost done"
-    jobStatus.progress = 0.8
+@SocaityRouter.add_route("/predict", queue_size=10)
+def predict(job_progress: JobProgress, my_param1: str, my_param2: int = 0):
+    job_progress._message = "I am working on it"
+    job_progress._progress = 0.5
+    job_progress._message = "Still working on it. Almost done"
+    job_progress._progress = 0.8
     return "my_awesome_prediction"
 ```
 When the return is finished, the job is marked as done and the progress bar is automatically set to 1.
 
-### Run sync
-If you want to run the endpoint sync, you can add ?sync=true to the endpoint, to wait for the result.
-Then the server will wait with a response until the job is finished.
+
+
+
 
 # Deploying a Service to production
 

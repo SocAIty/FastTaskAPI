@@ -5,7 +5,7 @@ from typing import Union
 
 from singleton_decorator import singleton
 
-from socaity_router.core.Job import InternalJob, JOB_STATUS
+from socaity_router.core.job.InternalJob import InternalJob, JOB_STATUS
 
 
 @singleton
@@ -41,6 +41,7 @@ class JobQueue:
 
         # add job to queue
         job.status = JOB_STATUS.QUEUED
+        job.queued_at = datetime.utcnow()
         self.queue.append(job)
 
         # start worker thread if not already done so
@@ -52,7 +53,15 @@ class JobQueue:
     def process_job(self, job: InternalJob):
         job.execution_started_at = datetime.utcnow()
         job.status = JOB_STATUS.PROCESSING
+
+        # if function has a param with the type JobProgress in the function signature, pass the job_progress object
+        if "job_progress" in job.job_function.__code__.co_varnames:
+            job.job_params["job_progress"] = job.job_progress
+
         job.result = job.job_function(**job.job_params)
+        # if execution was successful set _progress to 1.0 and status to finished
+        job.message = None
+        job.job_progress._progress = 1.0
         job.execution_finished_at = datetime.utcnow()
         job.status = JOB_STATUS.FINISHED
         # store result in results. Necessary in threading because thread itself cannot easily return values
@@ -97,7 +106,7 @@ class JobQueue:
         if job:
             return job
 
-        # check if in progress
+        # check if in _progress
         job = next((th['job'] for th in self.in_progress if th["job_id"] == job_id), None)
         if job:
             return job

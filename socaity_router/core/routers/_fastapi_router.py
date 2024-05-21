@@ -1,44 +1,47 @@
-from fastapi import APIRouter
+import inspect
+from typing import Union
+
+from fastapi import APIRouter, FastAPI
+
+from socaity_router.core.job import JobProgress
 from socaity_router.CONSTS import SERVER_STATUS
 from socaity_router.core.JobQueue import JobQueue
+from socaity_router.core.job.JobResult import JobResult, JobResultFactory
+from socaity_router.core.routers._SocaityRouter import _SocaityRouter
 from socaity_router.core.routers.router_mixins._queue_mixin import _QueueMixin
 
 
-class SocaityFastAPIRouter(APIRouter, _QueueMixin):
+class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
 
-    def __init__(self):
-        #super(APIRouter, self).__init__()
-        #super(_QueueMixin, self).__init__()
-        super().__init__()
+    def __init__(self, app: Union[FastAPI, None] = None, prefix: str = "/api", *args, **kwargs):
+        """
+        :param app: You can pass an existing fastapi app, if you like to have multiple routers in one app
+        :param prefix: The prefix of this router for the paths
+        :param args: other fastapi router arguments
+        :param kwargs: other fastapi router keyword arguments
+        """
+
+        super().__init__(*args, **kwargs)
         self.job_queue = JobQueue()
         self.status = SERVER_STATUS.INITIALIZING
+        self.app = app
+        self.prefix = prefix
+        self.add_standard_routes()
 
-        # add the get_status function to the routes
-        # self.add_api_route(path="/status")
+    def add_standard_routes(self):
+        self.api_route(path="/job", methods=["POST"])(self.get_job)
+        self.api_route(path="/status", methods=["GET"])(self.get_status)
 
-    def get_status(self):
-        jobs_status = self.job_queue.get_status()
-        return self.status
+    def get_job(self, job_id: str) -> JobResult:
+        """
+        Get the job with the given job_id
+        """
+        internal_job = self.job_queue.get_job(job_id)
+        if internal_job is None:
+            return JobResultFactory.job_not_found(job_id)
 
-    def start_func(self, *args, **kwargs):
-        """Decorator for subclasses to use like @start_func"""
-
-        def wrapper(s_func):
-            self.status = SERVER_STATUS.BOOTING
-            s_func(*args, **kwargs)
-            self.status = SERVER_STATUS.RUNNING
-
-        return wrapper
-
-    def start_func_serverless(self, *args, **kwargs):
-        """Decorator for subclasses to use like @start_func_serverless"""
-
-        def wrapper(s_func):
-            self.status = SERVER_STATUS.BOOTING
-            s_func(*args, **kwargs)
-            self.status = SERVER_STATUS.RUNNING
-
-        return wrapper
+        ret_job = JobResultFactory.from_internal_job(internal_job)
+        return ret_job
 
     def add_route(
             self,
@@ -69,96 +72,35 @@ class SocaityFastAPIRouter(APIRouter, _QueueMixin):
             **kwargs
         )
         def decorator(func):
-            return fastapi_route_decorator_func(queue_router_decorator_func(func))
+            queue_decorated = queue_router_decorator_func(func)
+            # remove job_progress from the function signature to display nice for fastapi
+            # either param type is JobProgress or the name is job_progress
+            for param in inspect.signature(func).parameters.values():
+                if param.annotation == JobProgress or param.name == "job_progress":
+                    # exclude the job_progress parameter from the signature
+                    # note that because the queue_router_decorator_func was used before,
+                    # the job_progress param was already registered.
+                    new_sig = inspect.signature(func).replace(parameters=[
+                        p for p in inspect.signature(func).parameters.values()
+                        if p.name != "job_progress" or p.annotation != JobProgress
+                    ])
+                    queue_decorated.__signature__ = new_sig
+                    break
+
+            return fastapi_route_decorator_func(queue_decorated)
 
         return decorator
 
+    def start(self, environment="localhost", port=8000):
+        """
+        Start the FastAPI server and add this router.
+        """
+        # fast API start
+        if self.app is None:
+            self.app = FastAPI()
 
+        self.app.include_router(self)
 
-#class SocaityFastAPIRouter(APIRouter, _SocaityRouter):
-#
-#    def api_route(
-#        self,
-#        path: str = None,
-#        *args,
-#        **kwargs
-#    ):
-#        """
-#        Adds an additional wrapper to the API path to add functionality like:
-#        - Add api key validation
-#        - Create a job and add to the job queue
-#        - Return job
-#        """
-#
-#        fastapi_route_decorator_func = super().api_route(
-#            path,
-#            *args,
-#            **kwargs
-#        )
-#
-#        def decorator(func):
-#            # With this wrapper we create the job while execution and add it to the job queue.
-#            @functools.wraps(func)
-#            def wrapper(*wrapped_func_args, **wrapped_func_kwargs) -> JobResult:
-#                ## Get the parameters of the original function
-#                #func_params = inspect.signature(func).parameters
-##
-#                ## Add the new parameter to the wrapper's signature
-#                #new_params = list(func_params.values()) + [
-#                #    inspect.Parameter("provider", inspect.Parameter.KEYWORD_ONLY, default=None)]
-#                #new_signature = inspect.Signature(new_params)
-##
-#                ## Bind the arguments to the new signature
-#                #bound_args = new_signature.bind(*args, **kwargs)
-#                #bound_args.apply_defaults()
-#
-#
-#                print("decorator before")
-#                ret = func(*wrapped_func_args, **wrapped_func_kwargs)
-#                print("decorator after")
-#                return ret
-#
-#                # Get the original function's signature
-#
-#            # Get the original function's signature
-#            #orig_sig = inspect.signature(func)
-##
-#            ## Construct parameters for the new signature
-#            #new_params = list(orig_sig.parameters.values())
-#            #new_params.append(inspect.Parameter("provider", inspect.Parameter.POSITIONAL_OR_KEYWORD, default=None))
-##
-#            ## orig_sig.parameters["provider"] = inspect.Parameter("provider", inspect.Parameter.KEYWORD_ONLY, default=None)
-#            ##new_params = []
-#            ##for name, param in orig_sig.parameters.items():
-#            ##    new_params.append(param)
-#            ##    if param.kind == inspect.Parameter.VAR_POSITIONAL:
-#            ##        new_params.append(inspect.Parameter("provider", inspect.Parameter.KEYWORD_ONLY, default=None))
-###
-#            ### Construct a new signature for the wrapper function
-#            #wrapper_sig = orig_sig.replace(parameters=new_params)
-##
-#            ## Update the wrapper function's signature
-#            #wrapper.__signature__ = wrapper_sig
-#
-#            return fastapi_route_decorator_func(wrapper)
-#
-#        return decorator
-#
-#    def get(
-#        self,
-#        path: str = None,
-#        provider: str = None,
-#        runpod_endpoint_id: str = None,
-#        replicate_model_name: str = None,
-#        *args,
-#        **kwargs
-#    ):
-#        return self.api_route(
-#            path=path,
-#            provider=provider,
-#            runpod_endpoint_id=runpod_endpoint_id,
-#            replicate_model_name=replicate_model_name,
-#            methods=["GET"],
-#            *args,
-#            **kwargs
-#        )
+        import uvicorn
+        uvicorn.run(self.app, host=environment, port=port)
+

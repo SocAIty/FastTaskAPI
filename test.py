@@ -1,9 +1,20 @@
-# your_handler.py
-from fastapi import FastAPI
-from socaity_router import SocaityRouter
+import time
 
-# router = SocaityRouter(provider="runpod", environment="localhost")
-router = SocaityRouter(provider="fastapi", environment="localhost")
+from socaity_router import SocaityRouter
+from socaity_router import JobProgress
+
+#router = SocaityRouter(provider="runpod")
+router = SocaityRouter(provider="fastapi")
+
+@router.add_route("/predict", queue_size=10)
+def predict(job_progress: JobProgress, my_param1: str, my_param2: int = 0):
+    job_progress.set_status(0.1, "I am working on it")
+    time.sleep(1)
+    job_progress.set_status(0.5, "I am working on it")
+    time.sleep(2)
+    job_progress.set_status(0.8, "Still working on it. Almost done")
+    time.sleep(2)
+    return f"my_awesome_prediction {my_param1}"
 
 @router.add_route(path="func1")
 def func1(myarg1: int, myarg2):
@@ -15,24 +26,8 @@ def func2(myarg3: int, myarg2):
 
 
 if __name__ == "__main__":
-    import uvicorn
-    app = FastAPI()
-    app.include_router(router, prefix="/api")
-    uvicorn.run(app, host="localhost", port=8000)
+    # Runpod version
+    router.start(port=8000)
+    # router.start(environment="serverless", port=8000)
+    # router.start(environment="localhost", port=8000)
 
-# router.start()
-
-#import runpod  # Required.
-#
-#def handler(job):
-#    job_input = job["input"]  # Access the input from the request.
-#    # Add your custom code here.
-#    return "Your job results"
-#
-#def handler2(job2):
-#    job_input = job2["input"]  # Access the input from the request.
-#    # Add your custom code here.
-#    return "Your job results2"
-#
-#
-#runpod.serverless.start({"handler": handler})  # Required.

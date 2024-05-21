@@ -1,7 +1,8 @@
-from typing import Optional
+from typing import Optional, Union
 from pydantic import BaseModel
 
-from socaity_router.core.Job import InternalJob
+from socaity_router.core.job import InternalJob
+from socaity_router.core.job.InternalJob import JOB_STATUS
 
 
 class JobResult(BaseModel):
@@ -13,7 +14,7 @@ class JobResult(BaseModel):
     status: Optional[str] = None
     progress: Optional[float] = 0.0
     message: Optional[str] = None
-    result: Optional[dict] = None
+    result: Optional[object] = None
 
     created_at: Optional[str] = None
     queued_at: Optional[str] = None
@@ -34,11 +35,19 @@ class JobResultFactory:
         return JobResult(
             id=ij.id,
             status=ij.status,
-            progress=ij.job_progress.progress,
-            message=ij.job_progress.message,
+            progress=ij.job_progress._progress,
+            message=ij.job_progress._message,
             result=ij.result,
             created_at=created_at,
             queued_at=queued_at,
             execution_started_at=execution_started_at,
             execution_finished_at=execution_finished_at
+        )
+
+    @staticmethod
+    def job_not_found(job_id: str) -> JobResult:
+        return JobResult(
+            id=job_id,
+            status=JOB_STATUS.FAILED,
+            message="Job not found."
         )

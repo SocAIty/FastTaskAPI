@@ -1,36 +1,23 @@
 from socaity_router.CONSTS import SERVER_STATUS
 
+
 class _SocaityRouter:
     """
     Base class for all routers.
     """
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.status = SERVER_STATUS.INITIALIZING
-        # add the get_status function to the routes
-        # self.add_api_route(path="/status")(self.get_status)
+        self.add_route(path="/status")(self.get_status)
+        self.add_route(path="/job")(self.get_job)
 
     def get_status(self) -> SERVER_STATUS:
         return self.status
 
-    def start(self):
+    def get_job(self, job_id: str):
         raise NotImplementedError("Implement in subclass")
 
-    #def start_func(self, *args, **kwargs):
-    #    """Decorator for subclasses to use like @start_func"""
-    #    def wrapper(s_func):
-    #        self.status = SERVER_STATUS.BOOTING
-    #        s_func(*args, **kwargs)
-    #        self.status = SERVER_STATUS.RUNNING
-    #    return wrapper
-#
-    #def start_func_serverless(self, *args, **kwargs):
-    #    """Decorator for subclasses to use like @start_func_serverless"""
-    #    def wrapper(s_func):
-    #        self.status = SERVER_STATUS.BOOTING
-    #        s_func(*args, **kwargs)
-    #        self.status = SERVER_STATUS.RUNNING
-#
-    #    return wrapper
+    def start(self):
+        raise NotImplementedError("Implement in subclass")
 
     def add_route(
             self,
