@@ -5,6 +5,11 @@ Plays well with existing providers like runpod and famous libraries like fastapi
 
 ### PACKAGE IS IN DEVELOPMENT
 We will release a pypi package as soon as the first version is stable.
+Until then you can clone / fork the repository or install the package with pip from the github repository.
+
+```python
+pip install git+git://github.com/SocAIty/socaity_router
+```
 
 
 ## Why is this useful?
@@ -77,11 +82,6 @@ Note: in case of "runpod", "serverless" this is not necessary, as the job mechan
 You can call the endpoints with a simple http request.
 You can try them out in the browser, with curl or Postman. 
 For more convenience with the socaity package, you can use the endpoints like functions.
-
- 
-
-
-
 
 ## Use the endpoints like functions with the socaity package.
 If you have the socaity package installed, you can use the endpoints like a function.
