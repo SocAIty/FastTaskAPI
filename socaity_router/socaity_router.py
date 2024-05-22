@@ -35,5 +35,7 @@ def SocaityRouter(
 
     router = class_map[provider](*args, **kwargs)
     # ToDo: add default endpoints status, get_job here instead of the subclasses
+    #router.add_route(path="/status")(router.get_status)
+    #router.add_route(path="/job")(router.get_job)
 
     return router

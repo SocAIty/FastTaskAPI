@@ -91,8 +91,7 @@ class JobQueue:
                     # set status to failed
                     j = job_thread["job"]
                     j.status = JOB_STATUS.TIMEOUT
-                    # kill thread
-                    job_thread["thread"].kill()
+                    # todo: implement method e.g with multiprocessing to kill thread
                     self.in_progress.remove(job_thread)
 
                     self.results.append(j)

@@ -1,8 +1,11 @@
 import functools
 import inspect
+import logging
 from typing import Union
 
+from socaity_router.compatibility.upload import UploadDataType
 from socaity_router.CONSTS import SERVER_STATUS
+from socaity_router.compatibility.upload import base64_to_file
 from socaity_router.core.job.JobProgress import JobProgressRunpod, JobProgress
 from socaity_router.core.routers._SocaityRouter import _SocaityRouter
 
@@ -17,15 +20,16 @@ class SocaityRunpodRouter(_SocaityRouter):
     The router is a runpod handler that routes the path to the correct function.
     All the runpod functionality is supported, jobs return an ID. Result can be fetched with the ID.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.routes = {}   # routes are organized like {"ROUTE_NAME": "ROUTE_FUNCTION"}
+        self.routes = {}  # routes are organized like {"ROUTE_NAME": "ROUTE_FUNCTION"}
 
     def add_route(
-        self,
-        path: str = None,
-        *args,
-        **kwargs
+            self,
+            path: str = None,
+            *args,
+            **kwargs
     ):
         """
         Adds an additional wrapper to the API path to add functionality like:
@@ -49,6 +53,11 @@ class SocaityRunpodRouter(_SocaityRouter):
 
         return decorator
 
+    def get(self, path: str = None, queue_size: int = 1, *args, **kwargs):
+        return self.add_route(path=path, queue_size=queue_size, *args, **kwargs)
+
+    def post(self, path: str = None, queue_size: int = 1, *args, **kwargs):
+        return self.add_route(path=path, queue_size=queue_size, *args, **kwargs)
 
     def _add_job_progress_to_kwargs(self, func, job, kwargs):
         """
@@ -74,6 +83,22 @@ class SocaityRunpodRouter(_SocaityRouter):
 
         return kwargs
 
+    @staticmethod
+    def _handle_file_uploads(func: callable, **kwargs):
+        """
+        Params of the function that are annotated with UploadDataType will be replaced with the file content.
+        """
+        for param in inspect.signature(func).parameters.values():
+            if isinstance(param.annotation, UploadDataType):
+                file = kwargs[param.name]
+                if isinstance(file, str):
+                    try:
+                        decoded_file = base64_to_file(file, param.annotation)
+                        kwargs[param.name] = decoded_file
+                    except Exception as e:
+                        logging.error(f"Error decoding file {param.name} in upload. We pass it as is. Error: {e}")
+
+        return kwargs
 
     def _router(self, path, job, **kwargs):
         """
@@ -91,7 +116,7 @@ class SocaityRunpodRouter(_SocaityRouter):
         if route_function is None:
             raise Exception(f"Route {path} not found")
 
-        # add the job_progress object to the function if necessary
+        # add the runpod job_progress object to the function if necessary
         kwargs = self._add_job_progress_to_kwargs(route_function, job, kwargs)
 
         # check the arguments for the path function
@@ -99,6 +124,9 @@ class SocaityRunpodRouter(_SocaityRouter):
         missing_args = [arg for arg in sig.parameters if arg not in kwargs]
         if len(missing_args) > 0:
             raise Exception(f"Arguments {missing_args} are missing")
+
+        # handle file uploads
+        kwargs = self._handle_file_uploads(route_function, **kwargs)
 
         # catch errors and display readable error messages
         try:
@@ -123,19 +151,20 @@ class SocaityRunpodRouter(_SocaityRouter):
 
         return self._router(route, job, **inputs)
 
-    def serverless_start(self):
-        import runpod.serverless
-        runpod.serverless.start({"handler": self.handler})
-
     def start(self, environment: Union[EXECUTION_ENVIRONMENTS, str] = EXECUTION_ENVIRONMENTS.SERVERLESS, port=8000):
         if type(environment) is str:
             environment = EXECUTION_ENVIRONMENTS(environment)
 
-        if environment == environment.SERVERLESS:
-            self.serverless_start()
+        if environment == environment.LOCALHOST:
+            # add the -rp_serve_api to the command line arguments to allow debugging
+            import sys
+            sys.argv.append("--rp_serve_api")
+
+            import runpod.serverless
+            runpod.serverless.start({"handler": self.handler})
+
+        elif environment == environment.SERVERLESS:
+            import runpod.serverless
+            runpod.serverless.start({"handler": self.handler})
         else:
             raise Exception(f"Not implemented for environment {environment}")
-
-
-
-

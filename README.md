@@ -28,6 +28,7 @@ The syntax is oriented by the simplicity of fastapi. Other hazards are taken car
 - Routing functionality for serverless providers like [Runpod](Runpod.io)
 - Adding jobs, job queues for your service (no code required)
 - Providing async, sync and streaming functionality.
+- Native fastapi like file-uploads for serverless providers like [Runpod](https://docs.runpod.io/serverless/workers/handlers/overview) 
 - Neat less integration into the SOCAITY ecosystem for running ai services like python functions.
 - Monitoring server state.
 
@@ -119,13 +120,10 @@ def predict(job_progress: JobProgress, my_param1: str, my_param2: int = 0):
 When the return is finished, the job is marked as done and the progress bar is automatically set to 1.
 
 
-
-
-
 # Deploying a Service to production
 
 ## Runpod
-It is not required to write a handler function anymore. The socaity router magic handles it :D
+It is not required to write a [handler](https://docs.runpod.io/serverless/workers/handlers/overview) function anymore. The socaity router magic handles it :D
 Just write a simple docker file and deploy it to runpod. 
 
 

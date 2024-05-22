@@ -7,8 +7,6 @@ class _SocaityRouter:
     """
     def __init__(self, *args, **kwargs):
         self.status = SERVER_STATUS.INITIALIZING
-        self.add_route(path="/status")(self.get_status)
-        self.add_route(path="/job")(self.get_job)
 
     def get_status(self) -> SERVER_STATUS:
         return self.status
@@ -31,5 +29,16 @@ class _SocaityRouter:
         """
         raise NotImplementedError("Implement in subclass")
 
-    def get(self, path: str = None, queue_size: int = 1):
+    def get(self, path: str = None, queue_size: int = 1, *args, **kwargs):
+        raise NotImplementedError("Implement in subclass. Consider using add_route instead.")
+
+    def post(self, path: str = None, queue_size: int = 1, *args, **kwargs):
+        raise NotImplementedError("Implement in subclass. Consider using add_route instead.")
+
+    @staticmethod
+    def _handle_file_uploads(func: callable):
+        """
+        Modify the function signature to handle file uploads.
+        :param func: the route function
+        """
         raise NotImplementedError("Implement in subclass")
