@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='socaity-router',
-    version='0.0.1',
+    version='0.0.2',
     description="A router for AI services running anywhere, locally, hosted, serverless and decentralized. Plays well with existing providers like runpod and famous libraries like fastapi.",
     author='SocAIty',
     packages=find_packages(),

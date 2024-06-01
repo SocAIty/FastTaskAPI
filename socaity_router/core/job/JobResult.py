@@ -15,12 +15,14 @@ class JobResult(BaseModel):
     progress: Optional[float] = 0.0
     message: Optional[str] = None
     result: Optional[object] = None
+    refresh_job_url: Optional[str] = None
 
     created_at: Optional[str] = None
     queued_at: Optional[str] = None
     execution_started_at: Optional[str] = None
     execution_finished_at: Optional[str] = None
 
+    endpoint_protocol: Optional[str] = "socaity"
 
 
 class JobResultFactory:
@@ -49,5 +51,5 @@ class JobResultFactory:
         return JobResult(
             id=job_id,
             status=JOB_STATUS.FAILED,
-            message="Job not found."
+            message="Job not found.",
         )

@@ -37,9 +37,7 @@ class InternalJob:
         self.id = str(uuid4())
         self.job_function = job_function
         self.job_params: Union[dict, None] = job_params
-
         self.status: JOB_STATUS = JOB_STATUS.QUEUED
-
         self.job_progress = JobProgress()
 
         self.result = None

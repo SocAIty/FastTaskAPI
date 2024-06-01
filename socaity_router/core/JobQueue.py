@@ -58,12 +58,18 @@ class JobQueue:
         if "job_progress" in job.job_function.__code__.co_varnames:
             job.job_params["job_progress"] = job.job_progress
 
-        job.result = job.job_function(**job.job_params)
-        # if execution was successful set _progress to 1.0 and status to finished
-        job.message = None
-        job.job_progress._progress = 1.0
+        try:
+            job.result = job.job_function(**job.job_params)
+            # if execution was successful set _progress to 1.0 and status to finished
+            job.message = None
+            job.job_progress._progress = 1.0
+            job.status = JOB_STATUS.FINISHED
+        except Exception as e:
+            job.result = None
+            job.message = str(e)
+            job.status = JOB_STATUS.FAILED
+
         job.execution_finished_at = datetime.utcnow()
-        job.status = JOB_STATUS.FINISHED
         # store result in results. Necessary in threading because thread itself cannot easily return values
         self.results.append(job)
 
@@ -112,13 +118,3 @@ class JobQueue:
 
         # return if in queue
         return next((job for job in self.queue if job.id == job_id), None)
-
-    async def wait_for_job_to_finish(self, job_id: str) -> Union[InternalJob, None]:
-        job = self.get_job(job_id)
-        if job is None:
-            return None
-
-        while job.status != JOB_STATUS.FINISHED:
-            time.sleep(1)
-
-        return job

@@ -28,9 +28,10 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
         self.prefix = prefix
         self.add_standard_routes()
 
-    #def add_standard_routes(self):
-    #    self.api_route(path="/job", methods=["POST"])(self.get_job)
-    #    self.api_route(path="/status", methods=["GET"])(self.get_status)
+
+    def add_standard_routes(self):
+        self.api_route(path="/job", methods=["GET", "POST"])(self.get_job)
+        self.api_route(path="/status", methods=["GET"])(self.get_status)
 
     def get_job(self, job_id: str) -> JobResult:
         """
@@ -41,6 +42,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
             return JobResultFactory.job_not_found(job_id)
 
         ret_job = JobResultFactory.from_internal_job(internal_job)
+        ret_job.refresh_job_url = f"/job?job_id={ret_job.id}"
         return ret_job
 
     @staticmethod
@@ -110,6 +112,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
             *args,
             **kwargs
         )
+
         queue_router_decorator_func = super().job_queue_func(
             path=path,
             queue_size=queue_size,
@@ -123,7 +126,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
             # modify file uploads for compatibility reasons
             file_upload_modified = self._handle_file_uploads(job_progress_removed)
 
-            return fastapi_route_decorator_func(job_progress_removed)
+            return fastapi_route_decorator_func(file_upload_modified)
 
         return decorator
 

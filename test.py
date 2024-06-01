@@ -1,6 +1,8 @@
+import random
 import time
 
 import fastapi
+from fastapi import HTTPException
 
 from socaity_router import SocaityRouter
 from socaity_router import JobProgress
@@ -29,6 +31,12 @@ def predict(job_progress: JobProgress, my_param1: str, my_param2: int = 0, my_pa
     job_progress.set_status(0.8, "Still working on it. Almost done")
     time.sleep(2)
     return f"my_awesome_prediction {my_param1}"
+
+@router.post("/kartoffel", queue_size=200)
+def kartoffel(mach_pommes: str):
+    time.sleep(random.randint(2, 10))
+    print(f"Kartoffel {mach_pommes} Pommes!")
+    return f"Kartoffel {mach_pommes} Pommes!"
 
 @router.add_route(path="func1")
 def func1(myarg1: int, myarg2):

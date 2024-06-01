@@ -44,6 +44,7 @@ class _QueueMixin:
                     job_params=wrapped_func_kwargs
                 )
                 ret_job = JobResultFactory.from_internal_job(internal_job)
+                ret_job.refresh_job_url = f"/job?job_id={ret_job.id}"
                 return ret_job
 
             return job_creation_func_wrapper
