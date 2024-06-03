@@ -3,7 +3,8 @@
 A router for AI services running anywhere, locally, hosted, serverless and decentralized.
 Plays well with existing providers like runpod and famous libraries like fastapi.
 
-### PACKAGE IS IN DEVELOPMENT
+### PACKAGE IS IN DEVELOPMENT!
+#### LEAVE A STAR TO SUPPORT US AN TO GET NOTIFIED WHEN THE PACKAGE IS RELEASED.
 We will release a pypi package as soon as the first version is stable.
 Until then you can clone / fork the repository or install the package with pip from the github repository.
 
@@ -72,8 +73,8 @@ def predict(my_param1: str, my_param2: int = 0):
     return "my_awesome_prediction"
 ```
 What will happen now is: 
-- The method will return a "Job" object instead of the result, including a job id.
-- By calling the endpoint with predict?job_id=... or the "status" endpoint you can get the result / status of the job.
+- The method will return a "Job" object instead of the result, including a job id. This json is send back to the client.
+- By calling the status endpoint with status?job_id=... one gets the result / status of the job.
 
 
 Note: in case of "runpod", "serverless" this is not necessary, as the job mechanism is handled by runpod deployment.
@@ -121,6 +122,10 @@ When the return is finished, the job is marked as done and the progress bar is a
 
 
 # Deploying a Service to production
+
+## Locally
+Just run the server. He is compatible with the socaity package.
+
 
 ## Runpod
 It is not required to write a [handler](https://docs.runpod.io/serverless/workers/handlers/overview) function anymore. The socaity router magic handles it :D
