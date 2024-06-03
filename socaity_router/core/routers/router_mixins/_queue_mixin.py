@@ -1,7 +1,7 @@
 import functools
 
 from socaity_router.CONSTS import SERVER_STATUS
-from socaity_router.core.JobQueue import JobQueue
+from socaity_router.core.JobManager import JobQueue
 from socaity_router.core.job.JobResult import JobResultFactory, JobResult
 
 class _QueueMixin:

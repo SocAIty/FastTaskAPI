@@ -6,7 +6,7 @@ from fastapi import APIRouter, FastAPI
 from socaity_router.compatibility.upload import convert_UploadDataType_to_FastAPI_UploadFile
 from socaity_router.core.job import JobProgress
 from socaity_router.CONSTS import SERVER_STATUS
-from socaity_router.core.JobQueue import JobQueue
+from socaity_router.core.JobManager import JobQueue
 from socaity_router.core.job.JobResult import JobResult, JobResultFactory
 from socaity_router.core.routers._SocaityRouter import _SocaityRouter
 from socaity_router.core.routers.router_mixins._queue_mixin import _QueueMixin

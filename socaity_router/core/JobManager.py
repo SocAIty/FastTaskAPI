@@ -14,7 +14,7 @@ class JobQueue:
         self.queue = []
         self.in_progress = []  # a list of {"job_id": job.id, "thread": t_job, "job": job}
         self.results = []
-        self.worker_thread = threading.Thread(target=self.do_work, daemon=True)
+        self.worker_thread = threading.Thread(target=self.process_jobs_in_background, daemon=True)
 
         # used to store the queue size for each function.
         # Limits the number of jobs that can be created for a specific path / function
@@ -73,7 +73,7 @@ class JobQueue:
         # store result in results. Necessary in threading because thread itself cannot easily return values
         self.results.append(job)
 
-    def do_work(self):
+    def process_jobs_in_background(self):
         while True:
             if len(self.queue) == 0 and len(self.in_progress) == 0:
                 time.sleep(2)
