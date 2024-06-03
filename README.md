@@ -18,7 +18,7 @@ Deploying AI services is hard.
 - Serverless deployments like runpod often DO NOT provide routing functionality.
 - The inference time makes realtime results difficult. Parallel jobs, and a Job queue is often required. 
 - Scaling AI services is hard.
-- Streaming (for example for generative models) is complicated to setup.
+- Streaming services (for example for generative models) is complicated to setup.
 
 
 This package solves these problems, by providing a simple well-known interface to deploy AI services anywhere.
@@ -30,7 +30,7 @@ The syntax is oriented by the simplicity of fastapi. Other hazards are taken car
 - Adding jobs, job queues for your service (no code required)
 - Providing async, sync and streaming functionality.
 - Native fastapi like file-uploads for serverless providers like [Runpod](https://docs.runpod.io/serverless/workers/handlers/overview) 
-- Neat less integration into the SOCAITY ecosystem for running ai services like python functions.
+- Neat less integration into the SOCAITY ecosystem for running ai services like python functions with our Client/SDK.
 - Monitoring server state.
 
 The code is fast, lightweight, pure python and meant to be flexible.
@@ -85,17 +85,21 @@ You can call the endpoints with a simple http request.
 You can try them out in the browser, with curl or Postman. 
 For more convenience with the socaity package, you can use the endpoints like functions.
 
-## Use the endpoints like functions with the socaity package.
+## Use the endpoints like functions with the socaity client.
 If you have the socaity package installed, you can use the endpoints like a function.
 This makes it insanely useful for complex scenarious where you use multiple models and endpoints.
 Socaity package release comes soon.
 
 #### Async
 
-```python
-job = predict("my_param1", my_param2=2)
-result = job.result(
+After you added your service_client to the SDK, you can call the endpoints like functions.
+Check-out the socaity package for more information.
 
+```python
+f2f = face2face()
+job = f2f.swap_one_from_file("test", target_img="test")
+job.run()
+result = job.wait_for_result()
 ```
 #### Run sync
 If you want to run the endpoint sync, you can add ?sync=true to the endpoint, to wait for the result.
@@ -123,14 +127,12 @@ When the return is finished, the job is marked as done and the progress bar is a
 
 # Deploying a Service to production
 
-## Locally
-Just run the server. He is compatible with the socaity package.
-
-
 ## Runpod
 It is not required to write a [handler](https://docs.runpod.io/serverless/workers/handlers/overview) function anymore. The socaity router magic handles it :D
 Just write a simple docker file and deploy it to runpod. 
 
+## Locally
+Just run the server. He is compatible with the socaity package.
 
 ## Writing your own Router
 
