@@ -1,0 +1,4 @@
+To build the wheel:
+python setup.py bdist_wheel
+To upload to pypi:
+python -m twine upload dist/*

@@ -1,20 +1,22 @@
-import random
 import time
 
 import fastapi
-from fastapi import HTTPException
+from fastapi import UploadFile as fastapiUploadFile
+from fastapi import File as fastapifile
+
 
 from socaity_router import SocaityRouter
 from socaity_router import JobProgress
 from socaity_router.compatibility.upload import UploadDataType
 from socaity_router.settings import EXECUTION_PROVIDER
+from socaity_router import UploadFile
 
 #router = SocaityRouter(provider="runpod")
 router = SocaityRouter(
     provider=EXECUTION_PROVIDER,
     app=fastapi.FastAPI(
-        title="Face2Face FastAPI",
-        summary="Swap faces from images. Create face embeddings. Integrate into hosted environments.",
+        title="FriesMaker",
+        summary="Make fries from potatoes",
         version="0.0.1",
         contact={
             "name": "w4hns1nn",
@@ -33,10 +35,23 @@ def predict(job_progress: JobProgress, my_param1: str, my_param2: int = 0, my_pa
     return f"my_awesome_prediction {my_param1}"
 
 @router.post("/kartoffel", queue_size=200)
-def kartoffel(mach_pommes: str):
-    time.sleep(random.randint(2, 10))
-    print(f"Kartoffel {mach_pommes} Pommes!")
-    return f"Kartoffel {mach_pommes} Pommes!"
+def kartoffel(image: UploadDataType.FILE):
+    return image
+
+@router.add_route("/make_fries")
+def make_fries(
+        job_progress: JobProgress,
+        potato_one: UploadDataType.FILE,
+        potato_two: UploadFile,
+        potato_three: fastapiUploadFile = fastapifile(...),
+    ):
+
+    potato_one_content = potato_one.content
+    potato_two_content = potato_two.content
+    potato_three_content = potato_three.content
+
+    return "fries"
+
 
 @router.add_route(path="func1")
 def func1(myarg1: int, myarg2):

@@ -1,9 +1,11 @@
+import functools
 import inspect
 from typing import Union
 
+from starlette.datastructures import UploadFile as StarletteUploadFile
 from fastapi import APIRouter, FastAPI
-
-from socaity_router.compatibility.upload import convert_UploadDataType_to_FastAPI_UploadFile
+from socaity_router.compatibility.upload import (convert_UploadDataType_to_FastAPI_UploadFile,
+                                                 starlette_uploadfile_to_socaity_upload_file, is_param_upload_file)
 from socaity_router.core.job import JobProgress
 from socaity_router.CONSTS import SERVER_STATUS
 from socaity_router.core.JobManager import JobQueue
@@ -31,7 +33,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
 
     def add_standard_routes(self):
         self.api_route(path="/job", methods=["GET", "POST"])(self.get_job)
-        self.api_route(path="/status", methods=["GET"])(self.get_status)
+        self.api_route(path="/status", methods=["GET", "POST"])(self.get_status)
 
     def get_job(self, job_id: str) -> JobResult:
         """
@@ -60,20 +62,53 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
                 func.__signature__ = new_sig
         return func
 
-    @staticmethod
-    def _handle_file_uploads(func: callable) -> callable:
+    def _handle_file_uploads(self, func: callable) -> callable:
         """
-        Modify the function signature to handle file uploads.
-        Parse the data and give it as binary to the function while execution
+        Modify the function signature for fastapi to handle file uploads.
+        Parse/Read the starlette.UploadFile and give it as read socaity UploadFile to the function while execution.
         """
+
+        # original func parameter names: needed multiple times
+        original_func_parameters = inspect.signature(func).parameters.values()
+        # create a dict to store the params that are UploadFiles
+        # this is used to later map the file while reading
+        upload_params = {
+            param.name: param.annotation
+            for param in original_func_parameters
+            if is_param_upload_file(param)
+        }
+
+        def read_file_if_is_upload_file(param_name: str, data):
+            # check if we have the file in our list
+            my_data_type = upload_params.get(param_name, None)
+            if my_data_type is not None:
+                return starlette_uploadfile_to_socaity_upload_file(data, my_data_type)
+            # if is not a file, return as is
+            return data
+
+        @functools.wraps(func)
+        def file_upload_wrapper(*args, **kwargs):
+            # args, kwargs to _ kwargs
+            org_func_names = [param.name for param in original_func_parameters]
+            nkwargs = {org_func_names[i]: arg for i, arg in enumerate(args)}
+            nkwargs.update(kwargs)
+            # convert to socaity UploadFile if it is a file
+            n_kwargs = {key: read_file_if_is_upload_file(key, value) for key, value in kwargs.items()}
+
+            return func(**n_kwargs)
+
         # replace signature with fastapi signature
+
         new_sig = inspect.signature(func).replace(parameters=[
             convert_UploadDataType_to_FastAPI_UploadFile(param)
-            if type(param.annotation) == compatibility.UploadDataType else param
-            for param in inspect.signature(func).parameters.values()
+            if is_param_upload_file(param) else param
+            for param in original_func_parameters
         ])
+        file_upload_wrapper.__signature__ = new_sig
         func.__signature__ = new_sig
-        return func
+
+        return file_upload_wrapper
+
         ## modify execution to handle file uploads in the same way as in runpod
         #def func_with_file_upload(*args, **kwargs):
         #    for param in inspect.signature(func).parameters.values():
@@ -120,12 +155,13 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
             **kwargs
         )
         def decorator(func):
+            # add the queue to the job queue
             queue_decorated = queue_router_decorator_func(func)
             # remove job_progress from the function signature to display nice for fastapi
             job_progress_removed = self._job_progress_signature_change(queue_decorated)
             # modify file uploads for compatibility reasons
             file_upload_modified = self._handle_file_uploads(job_progress_removed)
-
+            # add the route to fastapi
             return fastapi_route_decorator_func(file_upload_modified)
 
         return decorator

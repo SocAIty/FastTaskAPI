@@ -1,4 +1,5 @@
 uvicorn
 fastapi
+python-multipart
 singleton-decorator==1.0.0
 runpod >= 1.6.0
