@@ -3,9 +3,8 @@ import inspect
 import logging
 from typing import Union
 
-from socaity_router.compatibility.upload import UploadDataType
+from socaity_router.compatibility import UploadDataType
 from socaity_router.CONSTS import SERVER_STATUS
-from socaity_router.compatibility.upload import base64_to_file
 from socaity_router.core.job.JobProgress import JobProgressRunpod, JobProgress
 from socaity_router.core.routers._SocaityRouter import _SocaityRouter
 
@@ -88,12 +87,12 @@ class SocaityRunpodRouter(_SocaityRouter):
         """
         Params of the function that are annotated with UploadDataType will be replaced with the file content.
         """
+        raise NotImplementedError("File uploads are not implemented for runpod yet.")
         for param in inspect.signature(func).parameters.values():
             if isinstance(param.annotation, UploadDataType):
                 file = kwargs[param.name]
                 if isinstance(file, str):
                     try:
-                        decoded_file = base64_to_file(file, param.annotation)
                         kwargs[param.name] = decoded_file
                     except Exception as e:
                         logging.error(f"Error decoding file {param.name} in upload. We pass it as is. Error: {e}")

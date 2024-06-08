@@ -2,9 +2,8 @@ import functools
 import inspect
 from typing import Union
 
-from starlette.datastructures import UploadFile as StarletteUploadFile
 from fastapi import APIRouter, FastAPI
-from socaity_router.compatibility.upload import (convert_UploadDataType_to_FastAPI_UploadFile,
+from socaity_router.compatibility.upload import (convert_param_type_to_fast_api_upload_file,
                                                  starlette_uploadfile_to_socaity_upload_file, is_param_upload_file)
 from socaity_router.core.job import JobProgress
 from socaity_router.CONSTS import SERVER_STATUS
@@ -12,7 +11,7 @@ from socaity_router.core.JobManager import JobQueue
 from socaity_router.core.job.JobResult import JobResult, JobResultFactory
 from socaity_router.core.routers._SocaityRouter import _SocaityRouter
 from socaity_router.core.routers.router_mixins._queue_mixin import _QueueMixin
-import socaity_router.compatibility as compatibility
+
 
 class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
 
@@ -29,7 +28,6 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
         self.app = app
         self.prefix = prefix
         self.add_standard_routes()
-
 
     def add_standard_routes(self):
         self.api_route(path="/job", methods=["GET", "POST"])(self.get_job)
@@ -100,7 +98,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
         # replace signature with fastapi signature
 
         new_sig = inspect.signature(func).replace(parameters=[
-            convert_UploadDataType_to_FastAPI_UploadFile(param)
+            convert_param_type_to_fast_api_upload_file(param)
             if is_param_upload_file(param) else param
             for param in original_func_parameters
         ])

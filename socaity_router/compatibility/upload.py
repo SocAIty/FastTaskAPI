@@ -11,6 +11,16 @@ from typing import Union
 
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
+from socaity_router.compatibility.audio_file import AudioFile
+from socaity_router.compatibility.image_file import ImageFile
+from socaity_router.compatibility.upload_file import UploadFile
+from socaity_router.compatibility.video_file import VideoFile
+
+
+def _print_import_warning(class_name: str, lib_names: list):
+    print(f"Necessary libraries: {', '.join(lib_names)} are not installed. "
+          f"Please install them before using the {class_name} class.")
+
 
 class UploadDataType(Enum):
     """
@@ -23,50 +33,92 @@ class UploadDataType(Enum):
     VIDEO = "video"  # A video file. We will decode with opencv
 
 
-class UploadFile:
-    def __init__(self, content: bytes, file_type: str, file_name: str):
-        self.content = content
-        self.file_type = file_type
-        self.file_name = file_name
+def get_upload_file_class(
+        target_upload_file: Union[UploadDataType, UploadFile, ImageFile, AudioFile, VideoFile]
+) -> Union[UploadFile, ImageFile, AudioFile, VideoFile]:
+    target_upload_types = {
+        UploadDataType.FILE: UploadFile,
+        UploadDataType.IMAGE: ImageFile,
+        UploadDataType.AUDIO: AudioFile,
+        UploadDataType.VIDEO: VideoFile
+    }
+    if target_upload_file in target_upload_types:
+        target_upload_file = target_upload_types[target_upload_file]
+
+    # check for libs
+    if not target_upload_file._necessary_libs_installed():
+        _print_import_warning(target_upload_file.__name__, target_upload_file._get_necessary_libs())
+        target_upload_file = UploadFile
+
+    return target_upload_file
 
 
-class imageFile(UploadFile):
+def read_file_content_as_binary(file: Union[StarletteUploadFile, str, bytes]) -> bytes:
     """
-    A class to represent an image file.
+    Read a file to binary.
+    :param file: The file to read. Can be a StarletteUploadFile, a base64 string or binary data.
+    :return: The binary data.
     """
-
-    def __init__(self, image_data: bytes, file_type: str):
-        self.image_data = image_data
-        self.file_type = file_type
+    if isinstance(file, StarletteUploadFile):
+        return file.file.read()
+    elif isinstance(file, str):
+        return base64_to_binary_file(file)
+    else:
+        return file
 
 
 def starlette_uploadfile_to_socaity_upload_file(
         file: Union[StarletteUploadFile, str, bytes],
-        target_s_upload_type: UploadDataType
+        target_upload_file: UploadDataType
 ):
+    # get class ref like UploadFile, ImageFile, AudioFile, VideoFile
+    target_upload_file_class = get_upload_file_class(target_upload_file)
+
+    # get content, file_name and file_type
     file_name = None
     file_type = None
-    if isinstance(file, StarletteUploadFile):
-        content = file.file.read()
-        file_name = file.filename
-        file_type = file.content_type
-    elif isinstance(file, str):
-        content = base64_to_file(file, file_type=target_s_upload_type)
-    else:
-        content = file
+    content = read_file_content_as_binary(file)
 
-    # ToDo: add native image support
-    # if target_s_upload_type == UploadDataType.FILE:
+    instantiated_file = target_upload_file_class(file_name=file_name, file_type=file_type)
+    instantiated_file.from_binary(content)
+    return instantiated_file
+    #if isinstance(file, StarletteUploadFile):
+    #    content = file.file.read()
+    #    file_name = file.filename
+    #    file_type = file.content_type
+    #elif isinstance(file, str):
+    #    content = base64_to_file(file, file_type=target_upload_file)
+    #else:
+    #    content = file
+
+
+    # Create File
+
+
+
+    #if target_upload_file == UploadDataType.FILE:
     #    return UploadFile(file=content, file_type="file", file_name=file.filename)
-    # elif target_s_upload_type == UploadDataType.IMAGE:
-    #    return imageFile(image_data=content, file_type="image")
+    #elif target_upload_file == UploadDataType.IMAGE:
+    #    if not ImageFile._necessary_libs_installed():
+    #        _print_import_warning("ImageFile", ["opencv-python", "numpy"])
+    #        return UploadFile(content=content, file_type="file", file_name=file_name)
+    #    else:
+    #        return ImageFile(image_data=content, file_type="image")
+    #elif target_upload_file == UploadDataType.AUDIO:
+    #    if not AudioFile._necessary_libs_installed():
+    #        _print_import_warning("AudioFile", ["librosa", "numpy"])
+    #        return UploadFile(content=content, file_type="file", file_name=file_name)
+    #    else:
+    #        return AudioFile(audio_data=content, file_type="audio")
+#
+    ##    return imageFile(image_data=content, file_type="image")
+#
+    #return UploadFile(content=content, file_type=file_type, file_name=file_name)
 
-    return UploadFile(content=content, file_type=file_type, file_name=file_name)
 
-
-def base64_to_file(base64_str: str, file_type: UploadDataType = None):
+def base64_to_binary_file(base64_str: str):
     """
-    Convert a base64 string to a file.
+    Convert a base64 string to a binary file.
     :param base64_str: The base64 string
     :param file_path: The path to save the file
     :return: None
@@ -90,26 +142,16 @@ def is_param_upload_file(param: Parameter):
     Check if a parameter is a file upload.
     """
     from fastapi import UploadFile as fastapiUploadFile
-    type_check_list = [UploadDataType, UploadFile, StarletteUploadFile, fastapiUploadFile]
+    type_check_list = [
+        UploadDataType, UploadFile, ImageFile, AudioFile, VideoFile,
+        StarletteUploadFile, fastapiUploadFile
+    ]
     return type(param.annotation) in type_check_list or param.annotation in type_check_list
 
 
-def convert_UploadDataType_to_FastAPI_UploadFile(param: Parameter):
+def convert_param_type_to_fast_api_upload_file(param: Parameter):
     """
     Convert a UploadDataType to a FastAPI UploadFile type.
     """
     from fastapi import UploadFile as fastapiUploadFile
-    param_annotation_conversion_dict = {
-        UploadDataType.FILE: fastapiUploadFile,
-        UploadDataType.IMAGE: fastapiUploadFile,
-        UploadDataType.AUDIO: fastapiUploadFile,
-        UploadDataType.VIDEO: fastapiUploadFile,
-        UploadFile: fastapiUploadFile,
-        StarletteUploadFile: fastapiUploadFile,
-        fastapiUploadFile: fastapiUploadFile
-    }
-
-    if param.annotation not in param_annotation_conversion_dict:
-        raise Exception(f"UploadDataType {param.annotation} not supported in FastAPI")
-
-    return param.replace(annotation=param_annotation_conversion_dict[param.annotation])
+    return param.replace(annotation=fastapiUploadFile)

@@ -12,7 +12,6 @@ Until then you can clone / fork the repository or install the package with pip f
 pip install git+git://github.com/SocAIty/socaity_router
 ```
 
-
 ## Why is this useful?
 Deploying AI services is hard. 
 - Serverless deployments like runpod often DO NOT provide routing functionality.
@@ -29,11 +28,13 @@ The syntax is oriented by the simplicity of fastapi. Other hazards are taken car
 - Routing functionality for serverless providers like [Runpod](Runpod.io)
 - Adding jobs, job queues for your service (no code required)
 - Providing async, sync and streaming functionality.
+  - Including progress bars.
 - Native fastapi like file-uploads for serverless providers like [Runpod](https://docs.runpod.io/serverless/workers/handlers/overview) 
-- Neat less integration into the SOCAITY ecosystem for running ai services like python functions with our Client/SDK.
+  - Simplified usage of ImageFile, AudioFile, VideoFile
+- Neat less integration into the SOCAITY ecosystem for running AI services like python functions with our Client/SDK.
 - Monitoring server state.
 
-The code is fast, lightweight, pure python and meant to be flexible.
+The code is fast, lightweight, flexible and pure python.
 
 # How to use
 Just use the known syntax of fastapi to define your routes.
@@ -123,6 +124,31 @@ def predict(job_progress: JobProgress, my_param1: str, my_param2: int = 0):
     return "my_awesome_prediction"
 ```
 When the return is finished, the job is marked as done and the progress bar is automatically set to 1.
+
+
+### File uploads and files.
+
+The library supports file uploads out of the box. 
+Use the parameter type hints in your method definition to get the file.
+```python
+from socaity_router import UploadFile, ImageFile, AudioFile, VideoFile
+def my_upload(anyfile: UploadFile):
+    return anyfile.content
+```
+We have specializations for ImageFile, AudioFile and VideoFile.
+```python
+from socaity_router import ImageFile, AudioFile, VideoFile
+def my_upload_image(image: ImageFile, audio: AudioFile, video: VideoFile):
+    return image.content
+```
+
+Note that for using these files you also need to install other dependencies.
+For ImageFile you will need `opencv-python`, for AudioFile `librosa` and for VideoFile `moviepy`.
+If you want to install those dependencies easily run `pip install -r requirements_uploadfiles.txt`.
+
+You can call the endpoints, either with bytes or b64 encoded strings. 
+If you call the endpoint with the socaity-client it converts it for you automatically.
+
 
 
 # Deploying a Service to production
