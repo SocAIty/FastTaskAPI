@@ -4,9 +4,10 @@ import fastapi
 from fastapi import UploadFile as fastapiUploadFile
 from socaity_router import SocaityRouter
 from socaity_router import JobProgress
-from socaity_router.compatibility import UploadDataType
 from socaity_router.settings import EXECUTION_PROVIDER
 from socaity_router import UploadFile, ImageFile, AudioFile, VideoFile
+
+import numpy as np
 
 #router = SocaityRouter(provider="runpod")
 router = SocaityRouter(
@@ -34,26 +35,26 @@ def make_fries(job_progress: JobProgress, fries_name: str, amount: int = 1):
 
 @router.add_route("/make_file_fries")
 def make_fries_from_files(
-        potato_one: UploadDataType.FILE,
-        potato_two: UploadFile,
-        potato_three: fastapiUploadFile
+        potato_one: UploadFile,
+        potato_two: fastapiUploadFile,
     ):
-    potato_one_content = potato_one.content
-    potato_two_content = potato_two.content
-    potato_three_content = potato_three.content
+    potato_one_content = potato_one.to_bytes()
 
     return "fries"
 
 @router.add_route("/make_image_fries")
 def make_image_fries(
-        potato_one: UploadDataType.IMAGE,
+        potato_one: UploadFile,
         potato_two: ImageFile,
     ):
+    data1 = potato_one.to_bytes()
+    data2 = np.array(potato_two)
+
     return "image_fries"
 
 @router.add_route("/make_audio_fries")
 def make_audio_fries(
-        potato_one: UploadDataType.AUDIO,
+        potato_one: UploadFile,
         potato_two: AudioFile,
     ):
     potato_one_content = potato_one.content
@@ -63,7 +64,7 @@ def make_audio_fries(
 
 @router.add_route("/make_video_fries")
 def make_video_fries(
-        potato_one: UploadDataType.VIDEO,
+        potato_one: UploadFile,
         potato_two: VideoFile,
     ):
     potato_one_content = potato_one.content

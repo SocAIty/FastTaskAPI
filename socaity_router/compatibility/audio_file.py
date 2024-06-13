@@ -1,8 +1,7 @@
 import io
 from typing import Union
 
-from socaity.socaity_client.web.req.upload_files.upload_file import UploadFile
-
+from socaity_router.compatibility.upload_file import UploadFile
 
 class AudioFile(UploadFile):
     """

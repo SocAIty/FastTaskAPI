@@ -1,7 +1,14 @@
 import base64
 import io
+import mimetypes
 from typing import Union
 import os
+
+
+try:
+    import numpy as np
+except ImportError:
+    pass
 
 
 class UploadFile:
@@ -10,8 +17,8 @@ class UploadFile:
     Works natively with bytesio, base64 and binary data.
     """
     def __init__(self):
-        self.file_type = None
-        self.file_name = None
+        self.content_type = "application/octet-stream"
+        self.file_name = "file"
         self._content_buffer = io.BytesIO()
 
     def set_content(self, buffer: io.BytesIO, path_or_handle: Union[str, io.BytesIO, io.BufferedReader]):
@@ -24,15 +31,9 @@ class UploadFile:
             self._content_buffer = buffer
 
         # set file name and type
-        if isinstance(path_or_handle, str):
-            self.file_name = os.path.basename(path_or_handle)
-        else:
-            self.file_name = path_or_handle.name
-
-        # set file type
-        split = os.path.splitext(self.file_name)
-        if len(split) > 1:
-            self.file_type = os.path.splitext(self.file_name)[1]
+        self.file_name = path_or_handle if isinstance(path_or_handle, str) else path_or_handle.name
+        self.file_name = os.path.basename(self.file_name)
+        self.content_type = mimetypes.guess_type(self.file_name)[0] or "application/octet-stream"
 
     def from_file(self, path_or_handle: Union[str, io.BytesIO, io.BufferedReader]):
         """
@@ -42,7 +43,9 @@ class UploadFile:
             self.set_content(path_or_handle, path_or_handle)
         elif isinstance(path_or_handle, str):
             # read file from path
-            self.set_content(open(path_or_handle, 'rb'), path_or_handle)
+            with open(path_or_handle, 'rb') as file:
+                self.set_content(file, path_or_handle)
+                self.file_name = file.name
 
         return self
 
@@ -80,16 +83,17 @@ class UploadFile:
         return base64.b64encode(self.to_bytes()).decode()
 
     def from_np_array(self, np_array):
-        import numpy as np
         self._reset_buffer()
         np.save(self._content_buffer, np_array)
         self._content_buffer.seek(0)
         return self
 
     def to_np_array(self):
-        import numpy as np
         self._content_buffer.seek(0)
         return np.load(self._content_buffer)
+
+    def to_httpx_send_able_tuple(self):
+        return self.file_name, self.read(), self.content_type
 
     def _reset_buffer(self):
         self._content_buffer.seek(0)
@@ -98,7 +102,18 @@ class UploadFile:
     def read(self):
         self._content_buffer.seek(0)
         return self._content_buffer.read()
-#
+
+    def save(self, path: str):
+        with open(self.file_name, 'wb') as file:
+            file.write(self.read())
+
+    def __bytes__(self):
+        return self.to_bytes()
+
+    def __array__(self):
+        return self.to_np_array()
+
+
     @staticmethod
     def _necessary_libs_installed() -> bool:
         return True
