@@ -14,15 +14,23 @@ class ImageFile(UploadFile):
     """
     def from_bytes(self, data: bytes):
         super().from_bytes(data)
-        self._detect_image_type(self.to_np_array())
+        self._detect_image_type()
 
     def from_np_array(self, np_array: np.array):
-        super().from_np_array(np_array)
-        self._detect_image_type(np_array)
+        if "image/" not in self.content_type:
+            img_type, channels = self.detect_image_type_and_channels(np_array)
+        else:
+            img_type = self.content_type.split("/")[1]
+
+        is_success, buffer = cv2.imencode(f".{img_type}", np_array)
+        if is_success:
+            return super().from_bytes(buffer)
+        else:
+            raise ValueError(f"Could not convert np_array to {img_type} image")
 
     def from_base64(self, base64_str: str):
         super().from_base64(base64_str)
-        self._detect_image_type(self.to_np_array())
+        self._detect_image_type()
 
     def to_np_array(self):
         bytes = self.to_bytes()
@@ -34,8 +42,9 @@ class ImageFile(UploadFile):
     def save(self, path: str):
         cv2.imwrite(path, self.to_np_array())
 
-    def _detect_image_type(self, np_array: np.array):
-        img_type, channels = self.detect_image_type_and_channels(np_array)
+    def _detect_image_type(self):
+        np_array = self.to_np_array()
+        img_type, self._channels = self.detect_image_type_and_channels(np_array)
         if img_type is not None:
             self.content_type = f"image/{img_type}"
 

@@ -4,7 +4,6 @@ import mimetypes
 from typing import Union
 import os
 
-
 try:
     import numpy as np
 except ImportError:
@@ -44,8 +43,8 @@ class UploadFile:
         elif isinstance(path_or_handle, str):
             # read file from path
             with open(path_or_handle, 'rb') as file:
-                self.set_content(file, path_or_handle)
-                self.file_name = file.name
+                file_content = file.read()
+            self.from_bytes(file_content)
 
         return self
 
@@ -82,15 +81,33 @@ class UploadFile:
     def to_base64(self):
         return base64.b64encode(self.to_bytes()).decode()
 
-    def from_np_array(self, np_array):
+    def from_np_array(self, np_array: np.array):
+        """
+        Convert a numpy array to a file which is saved as bytes b"\x93NUMPY" into the buffer.
+        """
         self._reset_buffer()
         np.save(self._content_buffer, np_array)
-        self._content_buffer.seek(0)
         return self
 
-    def to_np_array(self):
-        self._content_buffer.seek(0)
-        return np.load(self._content_buffer)
+    def to_np_array(self, shape=None, dtype=np.uint8):
+        """
+        If file was created with from_np_array it will return the numpy array.
+        Else it will try to convert the file to a numpy array (note this is converted bytes representation of the file).
+        :param shape: The shape of the numpy array. If None it will be returned flat.
+        :param dtype: The dtype of the numpy array. If None it will be uint8.
+        """
+        bytes = self.to_bytes()
+        # check if was saved with np.save so bytes contains NUMPY
+        if bytes.startswith(b"\x93NUMPY"):
+            self._content_buffer.seek(0)
+            return np.load(self._content_buffer)
+
+        shape = shape or (1, len(bytes))
+        dtype = dtype or np.uint8
+
+        arr_flat = np.frombuffer(bytes, dtype=dtype)
+        return arr_flat.reshape(shape)
+
 
     def to_httpx_send_able_tuple(self):
         return self.file_name, self.read(), self.content_type
@@ -104,7 +121,15 @@ class UploadFile:
         return self._content_buffer.read()
 
     def save(self, path: str):
-        with open(self.file_name, 'wb') as file:
+        # create directory if not exists
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+
+        # if path includes filename save file there. If not append self.filename
+        if os.path.isdir(path):
+            path = os.path.join(path, self.file_name)
+
+        with open(path, 'wb') as file:
             file.write(self.read())
 
     def __bytes__(self):
