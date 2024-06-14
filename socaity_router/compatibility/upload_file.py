@@ -59,17 +59,25 @@ class UploadFile:
         return self._content_buffer.read()
 
     @staticmethod
-    def _decode_base_64_if_is(data: str):
+    def _decode_base_64_if_is(data: Union[bytes, str]):
         """
-        Checks if a string is base64. If it is it returns the decoded string; else returns None
+        Checks if a string is base64. If it is, it returns the base64 string as bytes; else returns None.
         """
-        # wie just encode the string and encode it back. If backencoding is the same string it was base64
-        decoded = base64.b64decode(data)
-        back_encoded = base64.b64encode(data)
-        if back_encoded == decoded:
-            return data
-        else:
-            return None
+        if isinstance(data, str):
+            data = data.encode()
+
+        try:
+            # Decode the data
+            decoded = base64.b64decode(data, validate=True)
+            # Re-encode the decoded data
+            back_encoded = base64.b64encode(decoded)
+            # Compare with the original encoded data
+            if back_encoded == data:
+                return decoded
+        except Exception:
+            pass
+
+        return None
 
     def from_base64(self, base64_str: str):
         decoded = self._decode_base_64_if_is(base64_str)

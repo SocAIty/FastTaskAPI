@@ -76,7 +76,7 @@ class JobQueue:
     def process_jobs_in_background(self):
         while True:
             if len(self.queue) == 0 and len(self.in_progress) == 0:
-                time.sleep(2)
+                time.sleep(1)
 
             # create new jobs from queue
             for job in self.queue:
@@ -102,9 +102,15 @@ class JobQueue:
 
                     self.results.append(j)
 
-    def get_job(self, job_id: str) -> Union[InternalJob, None]:
+            # ToDo: remove jobs from memory which are long finished and results not retrieved
+
+
+    def get_job(self, job_id: str, keep_in_memory: bool =False) -> Union[InternalJob, None]:
         """
         Get a job by its id. Returns None if the job does not exist.
+        :param job_id: the id of the job
+        :param keep_in_memory: if True, the job will be kept in memory even when finished and retrieved.
+            - By default jobs are removed from result memory when finished and get_job is called.
         """
         # check if in results
         job = next((job for job in self.results if job.id == job_id), None)
@@ -117,4 +123,6 @@ class JobQueue:
             return job
 
         # return if in queue
-        return next((job for job in self.queue if job.id == job_id), None)
+        job = next((job for job in self.results if job.id == job_id), None)
+        if not keep_in_memory:
+            self.queue.remove(job)

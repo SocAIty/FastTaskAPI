@@ -33,11 +33,11 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
         self.api_route(path="/job", methods=["GET", "POST"])(self.get_job)
         self.api_route(path="/status", methods=["GET", "POST"])(self.get_status)
 
-    def get_job(self, job_id: str) -> JobResult:
+    def get_job(self, job_id: str, keep_in_memory: bool = False) -> JobResult:
         """
         Get the job with the given job_id
         """
-        internal_job = self.job_queue.get_job(job_id)
+        internal_job = self.job_queue.get_job(job_id, keep_in_memory=keep_in_memory)
         if internal_job is None:
             return JobResultFactory.job_not_found(job_id)
 
