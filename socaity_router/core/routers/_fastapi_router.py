@@ -1,10 +1,11 @@
 import functools
 import inspect
 from typing import Union
+from multimodal_files.file_conversion import convert_to_upload_file_type
 
 from fastapi import APIRouter, FastAPI
 from socaity_router.compatibility.upload import (convert_param_type_to_fast_api_upload_file,
-                                                 starlette_uploadfile_to_socaity_upload_file, is_param_upload_file)
+                                                 is_param_upload_file)
 from socaity_router.core.job import JobProgress
 from socaity_router.CONSTS import SERVER_STATUS
 from socaity_router.core.JobManager import JobQueue
@@ -80,7 +81,9 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
             # check if we have the file in our list
             my_data_type = upload_params.get(param_name, None)
             if my_data_type is not None:
-                return starlette_uploadfile_to_socaity_upload_file(data, my_data_type)
+                return convert_to_upload_file_type(data, my_data_type)
+
+                # return starlette_uploadfile_to_socaity_upload_file(data, my_data_type)
             # if is not a file, return as is
             return data
 

@@ -45,15 +45,18 @@ def make_fries_from_files(
 @router.add_route("/make_image_fries")
 def make_image_fries(potato_one: ImageFile):
     data1 = potato_one.to_cv2_img()
-    return "image fries"
+    print(f"recieved data {data1.shape}")
+    return f"image fries {data1.shape}"
+
 
 @router.add_route("/make_audio_fries")
 def make_audio_fries(
         potato_one: UploadFile,
         potato_two: AudioFile,
     ):
-    potato_one_content = potato_one.content
-    potato_two_content = potato_two.content
+
+    potato_one_content = potato_one.to_bytes()
+    potato_two_content = potato_two.to_np_array()
 
     return "audio_fries"
 

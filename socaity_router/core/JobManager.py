@@ -61,12 +61,11 @@ class JobQueue:
         try:
             job.result = job.job_function(**job.job_params)
             # if execution was successful set _progress to 1.0 and status to finished
-            job.message = None
-            job.job_progress._progress = 1.0
+            job.job_progress.set_status(1.0, None)
             job.status = JOB_STATUS.FINISHED
         except Exception as e:
             job.result = None
-            job.message = str(e)
+            job.job_progress.set_status(1.0, str(e))
             job.status = JOB_STATUS.FAILED
 
         job.execution_finished_at = datetime.utcnow()
@@ -77,6 +76,7 @@ class JobQueue:
         while True:
             if len(self.queue) == 0 and len(self.in_progress) == 0:
                 time.sleep(1)
+                continue
 
             # create new jobs from queue
             for job in self.queue:
