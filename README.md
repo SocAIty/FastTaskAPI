@@ -1,21 +1,28 @@
-# SOCAITY ROUTER
+<p align="center">
+  <img src="docs/socaity_router_icon.png" height="200" />
+  <h1 align="center" style="margin-top:-25px">SOC<span style="color: #a0d802">AI</span>TY ROUTER</h1>
+</p>
 
-A router for AI services running anywhere, locally, hosted, serverless and decentralized.
+
+SOCAITY ROUTER is a Python-based routing solution for services. It allows you to deploy AI services anywhere, be it locally, hosted, serverless, or decentralized. 
+It integrates seamlessly with providers like Runpod and libraries like FastAPI.
 Plays well with existing providers like runpod and famous libraries like fastapi.
 
-### PACKAGE IS IN DEVELOPMENT!
-#### LEAVE A STAR TO SUPPORT US AN TO GET NOTIFIED WHEN THE PACKAGE IS RELEASED.
-We will release a pypi package as soon as the first version is stable.
-Until then you can clone / fork the repository or install the package with pip from the github repository.
+## Table of contents
 
-```python
-pip install git+git://github.com/SocAIty/socaity_router
-```
+Introduction
+- [Why is this useful?](#why-is-this-useful): A section explaining why you should use this package.
+- [What does this do?](#what-does-this-do): A section explaining the features of this package.
+
+Get started:
+- [Installation](#installation): A section explaining how to install the package.
+- [First-steps](#how-to-use): Create your first service with the socaity router.
+
 
 ## Why is this useful?
-Deploying AI services is hard. 
-- Serverless deployments like runpod often DO NOT provide routing functionality.
-- The inference time makes realtime results difficult. Parallel jobs, and a Job queue is often required. 
+Deploying AI services is hard.
+- The inference time makes realtime results difficult. Parallel jobs, and a Job queue is often required. For example as a client you would not like to wait for a server response instead do some work until the server produced the result.
+- Serverless deployments like runpod often DO NOT provide routing functionality. This router works in this conditions.
 - Scaling AI services is hard.
 - Streaming services (for example for generative models) is complicated to setup.
 
@@ -25,31 +32,54 @@ The syntax is oriented by the simplicity of fastapi. Other hazards are taken car
 
 ## What does this do?
 
-- Routing functionality for serverless providers like [Runpod](Runpod.io)
-- Adding jobs, job queues for your service (no code required)
-- Providing async, sync and streaming functionality.
+- Routing functionality: for serverless providers like [Runpod](Runpod.io)
+- Automized jobs, job queues for your service (no code required).
+- Async, sync and streaming functionality.
   - Including progress bars.
-- Native fastapi like file-uploads for serverless providers like [Runpod](https://docs.runpod.io/serverless/workers/handlers/overview) 
-  - Simplified usage of ImageFile, AudioFile, VideoFile
-- Neat less integration into the SOCAITY ecosystem for running AI services like python functions with our Client/SDK.
+- File support, also for serverless providers like [Runpod](https://docs.runpod.io/serverless/workers/handlers/overview) 
+  - Simplified sending files to the service with socaity-client 
+  - One line file response with [multimodal-files](https://github.com/SocAIty/multimodal-files) including images, audio, video and more.
+- Integration: integrates neatly into the SOCAITY ecosystem for running AI services like python functions with our [Client](https://github.com/SocAIty/socaity-client)/[SDK](https://github.com/SocAIty/socaity).
 - Monitoring server state.
 
 The code is fast, lightweight, flexible and pure python.
 
-# How to use
-Just use the known syntax of fastapi to define your routes.
+## Installation 
+You can install the package with PIP, or clone the repository.
+Install the package with pip from the github repository.
 
 ```python
-from socaity_router import SocaityRouter
+pip install git+git://github.com/SocAIty/socaity_router
+```
+We will release a pypi package as soon as the first version is stable.
 
-router = SocaityRouter(provider="runpod", environment="localhost")
 
-@SocaityRouter.add_route("/predict")
+# How to use
+## Create your first service
+Use the decorator syntax @router.add_route to add a route. This syntax is similar to [fastapi](https://fastapi.tiangolo.com/tutorial/first-steps/)'s @app.get syntax.
+
+```python
+from socaity_router import SocaityRouter, ImageFile
+
+# define the router including your provider (fastapi, runpod..)
+router = SocaityRouter() 
+
+# add endpoints to your service
+@router.add_route("/predict")
 def predict(my_param1: str, my_param2: int = 0):
-    return "my_awesome_prediction"
+    return f"my_awesome_prediction {my_param1} {my_param2}"
 
+@router.add_route("/img2img")
+def my_image_manipulator(upload_img: ImageFile):
+    img_as_numpy = np.array(upload_img)  # this returns a np.array read with cv2
+    my_manipulated_image = my_image_manipulator(img_as_numpy)
+    return ImageFile.from_numpy_array(my_manipulated_image)
+
+# start and run the server
 router.start()
 ```
+
+
 Set environment variables to determine the deployment target or provide the values in the constructor.
 Default is ```EXECUTION_ENVIORNMENT="localhost"``` and ```EXECUTION_PROVIDER="fastapi"```.
 Possible values are ```"local"```, ```"serverless"```, ```"hosted"```, ```"decentralized"``` and ```"fastapi"```, ```"runpod"```
@@ -66,17 +96,21 @@ No custom handler writing is required.
 
 ## Jobs and job queues
 
-If you have a long running task, you can use the job queue functionality. By default, the queue size is 100.
+If you have a long running task, you can use the job queue functionality. 
 ```python
-@SocaityRouter.add_route("/predict", queue_size=100)
-def predict(my_param1: str, my_param2: int = 0):
-    time.sleep(10) # heavy computation
-    return "my_awesome_prediction"
+@router.post(path="/make_fries", queue_size=100)
+def make_fries(job_progress: JobProgress, fries_name: str, amount: int = 1):
+    job_progress.set_status(0.1, f"started new fries creation {fries_name}")
+    time.sleep(1)
+    job_progress.set_status(0.5, f"I am working on it. Lots of work to do {amount}")
+    time.sleep(2)
+    job_progress.set_status(0.8, "Still working on it. Almost done")
+    time.sleep(2)
+    return f"Your fries {fries_name} are ready"
 ```
 What will happen now is: 
 - The method will return a "Job" object instead of the result, including a job id. This json is send back to the client.
 - By calling the status endpoint with status?job_id=... one gets the result / status of the job.
-
 
 Note: in case of "runpod", "serverless" this is not necessary, as the job mechanism is handled by runpod deployment.
 
@@ -166,3 +200,7 @@ Just run the server. He is compatible with the socaity package.
 ## Writing your own Router
 
 You can also write your own router to extend the SocaityRouters capabilities.
+
+
+## Note: THE PACKAGE IS STILL IN DEVELOPMENT!
+#### LEAVE A STAR TO SUPPORT US. ANY BUG REPORT OR CONTRIBUTION IS HIGHLY APPRECIATED.
