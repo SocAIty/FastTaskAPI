@@ -1,12 +1,19 @@
 <p align="center">
   <img src="docs/socaity_router_icon.png" height="200" />
   <h1 align="center" style="margin-top:-25px">SOC<span style="color: #a0d802">AI</span>TY ROUTER</h1>
+  <h3 align="center" style="margin-top:-20px">Create web-APIs for long-running tasks</h3>
+</p>
+
+<p align="center">
+Create a job and return a job id. Get the result with the job id later.</br>
+Socaity router creates threaded jobs and job queues on the fly.</br>
+Run services anywhere, be it local, hosted or serverless.</br>
 </p>
 
 
-SOCAITY ROUTER is a Python-based routing solution for services. It allows you to deploy AI services anywhere, be it locally, hosted, serverless, or decentralized. 
-It integrates seamlessly with providers like Runpod and libraries like FastAPI.
-Plays well with existing providers like runpod and famous libraries like fastapi.
+We developed socaity router to create and deploy our AI services as easy and standardized as possible.
+Built on-top of FastAPI and runpod provide high quality endpoints with proven stability. 
+
 
 ## Table of contents
 
@@ -20,7 +27,7 @@ Get started:
 
 
 ## Why is this useful?
-Deploying AI services is hard.
+Creating AI services is hard.
 - The inference time makes realtime results difficult. Parallel jobs, and a Job queue is often required. For example as a client you would not like to wait for a server response instead do some work until the server produced the result.
 - Serverless deployments like runpod often DO NOT provide routing functionality. This router works in this conditions.
 - Scaling AI services is hard.
@@ -33,7 +40,7 @@ The syntax is oriented by the simplicity of fastapi. Other hazards are taken car
 ## What does this do?
 
 - Routing functionality: for serverless providers like [Runpod](Runpod.io)
-- Automized jobs, job queues for your service (no code required).
+- Jobs, job queues for your service (no code required).
 - Async, sync and streaming functionality.
   - Including progress bars.
 - File support, also for serverless providers like [Runpod](https://docs.runpod.io/serverless/workers/handlers/overview) 
