@@ -1,11 +1,12 @@
 import functools
 import inspect
 from typing import Union
+
 from multimodal_files.file_conversion import convert_to_upload_file_type
 
 from fastapi import APIRouter, FastAPI
 from socaity_router.compatibility.upload import (convert_param_type_to_fast_api_upload_file,
-                                                 is_param_upload_file)
+                                                 is_param_multimodal_file)
 from socaity_router.core.job import JobProgress
 from socaity_router.CONSTS import SERVER_STATUS
 from socaity_router.core.JobManager import JobQueue
@@ -34,9 +35,13 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
         self.api_route(path="/job", methods=["GET", "POST"])(self.get_job)
         self.api_route(path="/status", methods=["GET", "POST"])(self.get_status)
 
-    def get_job(self, job_id: str, keep_in_memory: bool = False) -> JobResult:
+    def get_job(self, job_id: str, return_format: str = 'json', keep_in_memory: bool = False) -> JobResult:
         """
-        Get the job with the given job_id
+        Get the job with the given job_id.
+        :param job_id: The id of the job.
+        :param return_format: json or gzipped
+        :param keep_in_memory: If the job should be kept in memory.
+            If False, the job is removed after the result is returned.
         """
         internal_job = self.job_queue.get_job(job_id, keep_in_memory=keep_in_memory)
         if internal_job is None:
@@ -44,6 +49,10 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
 
         ret_job = JobResultFactory.from_internal_job(internal_job)
         ret_job.refresh_job_url = f"/job?job_id={ret_job.id}"
+
+        if return_format != 'json':
+            ret_job = JobResultFactory.gzip_job_result(ret_job)
+
         return ret_job
 
     @staticmethod
@@ -64,7 +73,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
     def _handle_file_uploads(self, func: callable) -> callable:
         """
         Modify the function signature for fastapi to handle file uploads.
-        Parse/Read the starlette.UploadFile and give it as read socaity UploadFile to the function while execution.
+        Parse/Read the starlette.MultiModalFile and give it as read socaity MultiModalFile to the function while execution.
         """
 
         # original func parameter names: needed multiple times
@@ -74,7 +83,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
         upload_params = {
             param.name: param.annotation
             for param in original_func_parameters
-            if is_param_upload_file(param)
+            if is_param_multimodal_file(param)
         }
 
         def read_file_if_is_upload_file(param_name: str, data):
@@ -93,16 +102,15 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
             org_func_names = [param.name for param in original_func_parameters]
             nkwargs = {org_func_names[i]: arg for i, arg in enumerate(args)}
             nkwargs.update(kwargs)
-            # convert to socaity UploadFile if it is a file
+            # convert to socaity MultiModalFile if it is a file
             n_kwargs = {key: read_file_if_is_upload_file(key, value) for key, value in kwargs.items()}
 
             return func(**n_kwargs)
 
         # replace signature with fastapi signature
-
         new_sig = inspect.signature(func).replace(parameters=[
             convert_param_type_to_fast_api_upload_file(param)
-            if is_param_upload_file(param) else param
+            if is_param_multimodal_file(param) else param
             for param in original_func_parameters
         ])
         file_upload_wrapper.__signature__ = new_sig
@@ -162,6 +170,8 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
             job_progress_removed = self._job_progress_signature_change(queue_decorated)
             # modify file uploads for compatibility reasons
             file_upload_modified = self._handle_file_uploads(job_progress_removed)
+            # modify file responses so that functions can return multimodal files.
+            # file_response_modified = self._handle_file_responses(file_upload_modified)
             # add the route to fastapi
             return fastapi_route_decorator_func(file_upload_modified)
 

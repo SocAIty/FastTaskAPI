@@ -130,9 +130,12 @@ When the return is finished, the job is marked as done and the progress bar is a
 
 The library supports file uploads out of the box. 
 Use the parameter type hints in your method definition to get the file.
+
 ```python
-from socaity_router import UploadFile, ImageFile, AudioFile, VideoFile
-def my_upload(anyfile: UploadFile):
+from socaity_router import MultiModalFile, ImageFile, AudioFile, VideoFile
+
+
+def my_upload(anyfile: MultiModalFile):
     return anyfile.content
 ```
 We have specializations for ImageFile, AudioFile and VideoFile.
