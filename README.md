@@ -44,7 +44,7 @@ This package solves these problems, by providing a simple well-known interface t
 The syntax is oriented by the simplicity of fastapi. Other hazards are taken care of by our router.
 
 
-<img align="right" src="docs/socaity_services.png" height="500" style="margin-left:-10px; margin-top: -10px" />
+<img align="right" src="docs/socaity_services.png" height="400" style="margin-top: 50px" />
 
 ## What does this do?
 
