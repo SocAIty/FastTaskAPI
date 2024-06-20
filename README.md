@@ -1,7 +1,8 @@
-<p align="center">
-  <img src="docs/socaity_router_icon.png" height="200" />
+
   <h1 align="center" style="margin-top:-25px">SOC<span style="color: #a0d802">AI</span>TY ROUTER</h1>
-  <h3 align="center" style="margin-top:-20px">Create web-APIs for long-running tasks</h3>
+  <h3 align="center" style="margin-top:-10px">Create web-APIs for long-running tasks</h3>
+<p align="center">
+  <img align="center" src="docs/socaity_router_icon.png" height="200" />
 </p>
 
 <p align="center">
@@ -12,7 +13,11 @@ Run services anywhere, be it local, hosted or serverless.</br>
 
 
 We developed socaity router to create and deploy our AI services as easy and standardized as possible.
-Built on-top of FastAPI and runpod provide high quality endpoints with proven stability. 
+Built on-top of FastAPI and runpod you can built high quality endpoints with proven stability. 
+
+
+
+
 
 
 ## Table of contents
@@ -26,6 +31,7 @@ Get started:
 - [First-steps](#how-to-use): Create your first service with the socaity router.
 
 
+
 ## Why is this useful?
 Creating AI services is hard.
 - The inference time makes realtime results difficult. Parallel jobs, and a Job queue is often required. For example as a client you would not like to wait for a server response instead do some work until the server produced the result.
@@ -34,8 +40,11 @@ Creating AI services is hard.
 - Streaming services (for example for generative models) is complicated to setup.
 
 
-This package solves these problems, by providing a simple well-known interface to deploy AI services anywhere.
+This package solves these problems, by providing a simple well-known interface to deploy AI services anywhere.</br>
 The syntax is oriented by the simplicity of fastapi. Other hazards are taken care of by our router.
+
+
+<img align="right" src="docs/socaity_services.png" height="500" style="margin-left:-10px; margin-top: -10px" />
 
 ## What does this do?
 
