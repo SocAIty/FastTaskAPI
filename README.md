@@ -44,8 +44,6 @@ This package solves these problems, by providing a simple well-known interface t
 The syntax is oriented by the simplicity of fastapi. Other hazards are taken care of by our router.
 
 
-
-
 ## What does this do?
 <img align="right" src="docs/socaity_services.png" height="400" style="margin-top: 50px" />
 
@@ -54,7 +52,7 @@ The syntax is oriented by the simplicity of fastapi. Other hazards are taken car
 - Async, sync and streaming functionality.
   - Including progress bars.
 - File support, also for serverless providers like [Runpod](https://docs.runpod.io/serverless/workers/handlers/overview) 
-  - Simplified sending files to the service with socaity-client 
+  - Simplified sending files to the services with [socaity-client](https://github.com/SocAIty/socaity-client) 
   - One line file response with [multimodal-files](https://github.com/SocAIty/multimodal-files) including images, audio, video and more.
 - Integration: integrates neatly into the SOCAITY ecosystem for running AI services like python functions with our [Client](https://github.com/SocAIty/socaity-client)/[SDK](https://github.com/SocAIty/socaity).
 - Monitoring server state.
@@ -89,27 +87,15 @@ def predict(my_param1: str, my_param2: int = 0):
 @router.add_route("/img2img")
 def my_image_manipulator(upload_img: ImageFile):
     img_as_numpy = np.array(upload_img)  # this returns a np.array read with cv2
-    my_manipulated_image = my_image_manipulator(img_as_numpy)
-    return ImageFile.from_numpy_array(my_manipulated_image)
+    # Do some hard work here...
+    # img_as_numpy = img2img(img_as_numpy)
+    return ImageFile().from_np_array(img_as_numpy)
 
 # start and run the server
 router.start()
 ```
-
-
-Set environment variables to determine the deployment target or provide the values in the constructor.
-Default is ```EXECUTION_ENVIORNMENT="localhost"``` and ```EXECUTION_PROVIDER="fastapi"```.
-Possible values are ```"local"```, ```"serverless"```, ```"hosted"```, ```"decentralized"``` and ```"fastapi"```, ```"runpod"```
-
-To deploy multiple methods for a serverless provider like Runpod simply set the environment variable ```EXECUTION_PROVIDER="runpod"```.
-Or use the constructor to set the provider.
-
-```python
-SocaityRouter(provider="fastapi")
-```
-To deploy to runpod all you have to do is to write a simple docker file to deploy the service. 
-No custom handler writing is required.
-
+If you execute this code you should see the following page under http://localhost:8000/docs.
+<img align="center" src="docs/demo_service.png" />
 
 ## Jobs and job queues
 
@@ -207,9 +193,26 @@ If you call the endpoint with the socaity-client it converts it for you automati
 
 # Deploying a Service to production
 
+To deploy multiple methods for a serverless provider like Runpod simply set the environment variable ```EXECUTION_PROVIDER="runpod"```.
+Or use the constructor to set the provider.
+
+```python
+router = SocaityRouter(provider="runpod")
+```
+Set environment variables to determine the deployment target or provide the values in the constructor.
+Default is ```EXECUTION_ENVIORNMENT="localhost"``` and ```EXECUTION_PROVIDER="fastapi"```.
+Possible values are ```"local"```, ```"serverless"```, ```"hosted"```, ```"decentralized"``` and ```"fastapi"```, ```"runpod"```
+
+To deploy to runpod all you have to do is to write a simple docker file to deploy the service. 
+No custom handler writing is required.
+
+
 ## Runpod
 It is not required to write a [handler](https://docs.runpod.io/serverless/workers/handlers/overview) function anymore. The socaity router magic handles it :D
+
+
 Just write a simple docker file and deploy it to runpod. 
+
 
 ## Locally
 Just run the server. He is compatible with the socaity package.

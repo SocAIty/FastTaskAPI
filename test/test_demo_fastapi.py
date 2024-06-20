@@ -1,20 +1,16 @@
-import time
-
 import fastapi
-from fastapi import UploadFile as fastapiUploadFile
 from socaity_router import SocaityRouter
 from socaity_router import JobProgress
 from socaity_router.settings import EXECUTION_PROVIDER
-from socaity_router import MultiModalFile, ImageFile, AudioFile, VideoFile
-
+from socaity_router import ImageFile
+import time
 import numpy as np
 
-#router = SocaityRouter(provider="runpod")
 router = SocaityRouter(
     provider=EXECUTION_PROVIDER,
     app=fastapi.FastAPI(
-        title="FriesMaker",
-        summary="Make fries from potatoes",
+        title="Best AI service ever",
+        summary="Make predictions and fries",
         version="0.0.1",
         contact={
             "name": "w4hns1nn",
@@ -22,7 +18,22 @@ router = SocaityRouter(
         }),
 )
 
-@router.post(path="/make_fries", queue_size=10)
+# define the router including your provider (fastapi, runpod..)
+router = SocaityRouter()
+
+# add endpoints to your service
+@router.add_route("/predict")
+def predict(my_param1: str, my_param2: int = 0):
+    return f"my_awesome_prediction {my_param1} {my_param2}"
+
+@router.add_route("/img2img")
+def my_image_manipulator(upload_img: ImageFile):
+    img_as_numpy = np.array(upload_img)  # this returns a np.array read with cv2
+    # Do some hard work here...
+    # img_as_numpy = img2img(img_as_numpy)
+    return ImageFile().from_np_array(img_as_numpy)
+
+@router.post(path="/make_fries", queue_size=100)
 def make_fries(job_progress: JobProgress, fries_name: str, amount: int = 1):
     job_progress.set_status(0.1, f"started new fries creation {fries_name}")
     time.sleep(1)
@@ -32,47 +43,5 @@ def make_fries(job_progress: JobProgress, fries_name: str, amount: int = 1):
     time.sleep(2)
     return f"Your fries {fries_name} are ready"
 
-
-@router.add_route("/make_file_fries")
-def make_fries_from_files(
-        potato_one: MultiModalFile,
-        potato_two: fastapiUploadFile,
-    ):
-    potato_one_content = potato_one.to_bytes()
-
-    return "fries"
-
-@router.add_route("/make_image_fries")
-def make_image_fries(potato_one: ImageFile):
-    data1 = potato_one.to_cv2_img()
-    print(f"recieved data {data1.shape}")
-    return f"image fries {data1.shape}"
-
-
-@router.add_route("/make_audio_fries")
-def make_audio_fries(
-        potato_one: MultiModalFile,
-        potato_two: AudioFile,
-    ):
-
-    potato_one_content = potato_one.to_bytes()
-    potato_two_content = potato_two.to_np_array()
-
-    return "audio_fries"
-
-@router.add_route("/make_video_fries")
-def make_video_fries(
-        potato_one: MultiModalFile,
-        potato_two: VideoFile,
-    ):
-    potato_one_content = potato_one.content
-    potato_two_content = potato_two.content
-    return "video_fries"
-
-
-if __name__ == "__main__":
-    # Runpod version
-    router.start(port=8000, environment="localhost")
-    # router.start(environment="serverless", port=8000)
-    # router.start(environment="localhost", port=8000)
-
+# start and run the server
+router.start()
