@@ -44,9 +44,10 @@ This package solves these problems, by providing a simple well-known interface t
 The syntax is oriented by the simplicity of fastapi. Other hazards are taken care of by our router.
 
 
-<img align="right" src="docs/socaity_services.png" height="400" style="margin-top: 50px" />
+
 
 ## What does this do?
+<img align="right" src="docs/socaity_services.png" height="400" style="margin-top: 50px" />
 
 - Routing functionality: for serverless providers like [Runpod](Runpod.io)
 - Jobs, job queues for your service (no code required).
