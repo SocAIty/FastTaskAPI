@@ -146,6 +146,12 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
 #
         #return func_with_file_upload
 
+    @functools.wraps(APIRouter.api_route)
+    def endpoint(self, path: str, methods: list[str] = None, *args, **kwargs):
+        def decorator(func):
+            self.api_route(path=path, methods=methods)(func)
+        return decorator
+
     def task_endpoint(
             self,
             path: str,

@@ -25,12 +25,14 @@ Introduction
 Get started:
 - [Installation](#installation): A section explaining how to install the package.
 - [First-steps](#how-to-use): Create your first service with the socaity router.
-
+- [Jobs and job queues](#jobs-and-job-queues): A section explaining how to use the job queue functionality.
+- [File uploads and files](#file-uploads-and-files): A section explaining how to use file uploads and files.
+- [Backends and deploying a service](#backends-and-deploying-a-service): Deploy serverless for example with runpod.
 
 
 ## Why is this useful?
-Creating AI services is hard.
-- The inference time makes realtime results difficult. Parallel jobs, and a Job queue is often required. For example as a client you would not like to wait for a server response instead do some work until the server produced the result.
+Creating services for long-running tasks is hard.
+- In AI services inference time makes realtime results difficult. Parallel jobs, and a Job queue is often required. For example as a client you would not like to wait for a server response instead do some work until the server produced the result.
 - Serverless deployments like runpod often DO NOT provide routing functionality. This router works in this conditions.
 - Scaling AI services is hard.
 - Streaming services (for example for generative models) is complicated to setup.
@@ -49,22 +51,21 @@ The syntax is oriented by the simplicity of fastapi. Other hazards are taken car
 - Async, sync and streaming functionality.
   - Including progress bars.
 - File support, also for serverless providers like [Runpod](https://docs.runpod.io/serverless/workers/handlers/overview) 
-  - Simplified sending files to the services with [socaity-client](https://github.com/SocAIty/socaity-client) 
+  - Simplified sending files to the services with [fastSDK](https://github.com/SocAIty/fastSDK) 
   - One line file response with [multimodal-files](https://github.com/SocAIty/multimodal-files) including images, audio, video and more.
-- Integration: integrates neatly into the SOCAITY ecosystem for running AI services like python functions with our [Client](https://github.com/SocAIty/socaity-client)/[SDK](https://github.com/SocAIty/socaity).
+- Integration: integrates neatly into the SOCAITY ecosystem for running AI services like python functions with our [Client](https://github.com/SocAIty/socaity-client)/[fastSDK](https://github.com/SocAIty/socaity).
 - Monitoring server state.
 
 The code is fast, lightweight, flexible and pure python.
 
 ## Installation 
 You can install the package with PIP, or clone the repository.
-Install the package with pip from the github repository.
 
 ```python
 # install from pypi
 pip install fast-task-api
 # install from github for the newest version
-pip install git+git://github.com/SocAIty/fast-task-api
+pip install git+git://github.com/SocAIty/FastTaskAPI
 ```
 
 # How to use
@@ -121,11 +122,9 @@ You can call the endpoints with a simple http request.
 You can try them out in the browser, with curl or Postman. 
 For more convenience with the socaity package, you can use the endpoints like functions.
 
-### Use the endpoints like functions with the socaity client.
-If you have the socaity package installed, you can use the endpoints like a function.
-This makes it insanely useful for complex scenarious where you use multiple models and endpoints.
-Socaity package release comes soon.
-
+### Use the endpoints like functions with [fastSDK](https://github.com/SocAIty/fastSDK).
+With fastSDK, you can use the endpoints like a function. FastSDK will deal with the job id and the status requests in the background.
+This makes it insanely useful for complex scenarios where you use multiple models and endpoints.
 
 ### Job status and progress bars
 
@@ -175,7 +174,7 @@ def my_upload_image(image: ImageFile, audio: AudioFile, video: VideoFile):
 ```
 You can call the endpoints, either with bytes or b64 encoded strings. 
 
-### Sending files to the service with FastSDK
+### Sending requests (and files) to the service with FastSDK
 
 FastSDK also natively support mutlimodal-files and for this reason it natively supports file up/downloads.
 Once you have added the service in FastSDK you can call it like a python function
@@ -260,6 +259,7 @@ This doesn't mean that we don't recommend celery. Indeed it is planned to integr
 # Roadmap
 
 - [x] stabilize runpod deployment
+- [x] streaming support
 - [x] add async functionality for fastapi
 - [x] support other job-quing systems like celery
 

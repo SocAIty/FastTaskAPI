@@ -22,7 +22,7 @@ class _SocaityRouter:
     def start(self):
         raise NotImplementedError("Implement in subclass")
 
-    def add_endpoint(self, path: str = None, *args, **kwargs):
+    def endpoint(self, path: str = None, *args, **kwargs):
         """
         Add a non-task route to the app. This means the method is called directly; no job thread is created.
         :param path:
@@ -32,7 +32,7 @@ class _SocaityRouter:
         :param kwargs: any other keyword arguments to configure the app
         :return:
         """
-        raise NotImplementedError("Implement in subclass")
+        raise NotImplementedError("Implement in subclass. Use a decorator for that.")
 
     def task_endpoint(
             self,
