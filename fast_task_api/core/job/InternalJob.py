@@ -3,7 +3,7 @@ from typing import Union
 from uuid import uuid4
 from enum import Enum
 
-from socaity_router.core.job.JobProgress import JobProgress
+from fast_task_api.core.job.JobProgress import JobProgress
 
 
 class JOB_STATUS(Enum):

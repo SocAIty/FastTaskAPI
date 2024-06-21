@@ -3,9 +3,9 @@ from io import BytesIO
 from typing import Optional, Union, Any
 
 from pydantic import BaseModel
-from socaity_router.compatibility.upload import is_param_multimodal_file
-from socaity_router.core.job import InternalJob
-from socaity_router.core.job.InternalJob import JOB_STATUS
+from fast_task_api.compatibility.upload import is_param_multimodal_file
+from fast_task_api.core.job import InternalJob
+from fast_task_api.core.job.InternalJob import JOB_STATUS
 
 
 class FileResult(BaseModel):

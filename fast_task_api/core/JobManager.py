@@ -5,7 +5,7 @@ from typing import Union
 
 from singleton_decorator import singleton
 
-from socaity_router.core.job.InternalJob import InternalJob, JOB_STATUS
+from fast_task_api.core.job.InternalJob import InternalJob, JOB_STATUS
 
 
 @singleton

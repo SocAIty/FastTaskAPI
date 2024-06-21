@@ -5,14 +5,14 @@ from typing import Union
 from multimodal_files.file_conversion import convert_to_upload_file_type
 
 from fastapi import APIRouter, FastAPI
-from socaity_router.compatibility.upload import (convert_param_type_to_fast_api_upload_file,
+from fast_task_api.compatibility.upload import (convert_param_type_to_fast_api_upload_file,
                                                  is_param_multimodal_file)
-from socaity_router.core.job import JobProgress
-from socaity_router.CONSTS import SERVER_STATUS
-from socaity_router.core.JobManager import JobQueue
-from socaity_router.core.job.JobResult import JobResult, JobResultFactory
-from socaity_router.core.routers._SocaityRouter import _SocaityRouter
-from socaity_router.core.routers.router_mixins._queue_mixin import _QueueMixin
+from fast_task_api.core.job import JobProgress
+from fast_task_api.CONSTS import SERVER_STATUS
+from fast_task_api.core.JobManager import JobQueue
+from fast_task_api.core.job.JobResult import JobResult, JobResultFactory
+from fast_task_api.core.routers._SocaityRouter import _SocaityRouter
+from fast_task_api.core.routers.router_mixins._queue_mixin import _QueueMixin
 
 
 class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):

@@ -3,11 +3,11 @@ import inspect
 from typing import Union
 
 
-from socaity_router.CONSTS import SERVER_STATUS
-from socaity_router.core.job.JobProgress import JobProgressRunpod, JobProgress
-from socaity_router.core.routers._SocaityRouter import _SocaityRouter
+from fast_task_api.CONSTS import SERVER_STATUS
+from fast_task_api.core.job.JobProgress import JobProgressRunpod, JobProgress
+from fast_task_api.core.routers._SocaityRouter import _SocaityRouter
 
-from socaity_router.CONSTS import EXECUTION_ENVIRONMENTS
+from fast_task_api.CONSTS import EXECUTION_ENVIRONMENTS
 
 
 class SocaityRunpodRouter(_SocaityRouter):

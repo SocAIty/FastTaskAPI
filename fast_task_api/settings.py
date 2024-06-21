@@ -1,6 +1,6 @@
 import sys
 from os import environ
-from socaity_router.CONSTS import EXECUTION_PROVIDERS, EXECUTION_ENVIRONMENTS
+from fast_task_api.CONSTS import EXECUTION_PROVIDERS, EXECUTION_ENVIRONMENTS
 
 # Set the execution mode
 EXECUTION_ENVIRONMENT = environ.get("EXECUTION_ENVIRONMENT", EXECUTION_ENVIRONMENTS.LOCALHOST)

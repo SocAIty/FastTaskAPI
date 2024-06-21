@@ -1,4 +1,4 @@
-from socaity_router.CONSTS import SERVER_STATUS
+from fast_task_api.CONSTS import SERVER_STATUS
 
 
 class _SocaityRouter:

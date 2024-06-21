@@ -1,11 +1,11 @@
-from socaity_router.CONSTS import EXECUTION_PROVIDERS
-from socaity_router.settings import EXECUTION_PROVIDER
-from socaity_router.core.routers._SocaityRouter import _SocaityRouter
-from socaity_router.core.routers._runpod_router import SocaityRunpodRouter
-from socaity_router.core.routers._fastapi_router import SocaityFastAPIRouter
+from fast_task_api.CONSTS import EXECUTION_PROVIDERS
+from fast_task_api.settings import EXECUTION_PROVIDER
+from fast_task_api.core.routers._SocaityRouter import _SocaityRouter
+from fast_task_api.core.routers._runpod_router import SocaityRunpodRouter
+from fast_task_api.core.routers._fastapi_router import SocaityFastAPIRouter
 from typing import Union
 
-def SocaityRouter(
+def FastTaskAPI(
         provider: Union[EXECUTION_PROVIDERS, str] = None,
         *args, **kwargs
 ) -> Union[_SocaityRouter, SocaityRunpodRouter, SocaityFastAPIRouter]:
@@ -33,9 +33,9 @@ def SocaityRouter(
     if provider not in class_map:
         raise Exception(f"Provider {provider.value} not found")
 
-    router = class_map[provider](*args, **kwargs)
+    backend_instance = class_map[provider](*args, **kwargs)
     # ToDo: add default endpoints status, get_job here instead of the subclasses
     #router.add_route(path="/status")(router.get_status)
     #router.add_route(path="/job")(router.get_job)
 
-    return router
+    return backend_instance

@@ -2,15 +2,15 @@ import time
 
 import fastapi
 from fastapi import UploadFile as fastapiUploadFile
-from socaity_router import SocaityRouter
-from socaity_router import JobProgress
-from socaity_router.settings import EXECUTION_PROVIDER
-from socaity_router import MultiModalFile, ImageFile, AudioFile, VideoFile
+from fast_task_api import FastTaskAPI
+from fast_task_api import JobProgress
+from fast_task_api.settings import EXECUTION_PROVIDER
+from fast_task_api import MultiModalFile, ImageFile, AudioFile, VideoFile
 
 import numpy as np
 
 #router = SocaityRouter(provider="runpod")
-router = SocaityRouter(
+router = FastTaskAPI(
     provider=EXECUTION_PROVIDER,
     app=fastapi.FastAPI(
         title="FriesMaker",

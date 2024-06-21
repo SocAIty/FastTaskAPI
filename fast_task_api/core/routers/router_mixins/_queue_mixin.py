@@ -1,8 +1,8 @@
 import functools
 
-from socaity_router.CONSTS import SERVER_STATUS
-from socaity_router.core.JobManager import JobQueue
-from socaity_router.core.job.JobResult import JobResultFactory, JobResult
+from fast_task_api.CONSTS import SERVER_STATUS
+from fast_task_api.core.JobManager import JobQueue
+from fast_task_api.core.job.JobResult import JobResultFactory, JobResult
 
 class _QueueMixin:
     """
