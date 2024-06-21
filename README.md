@@ -61,38 +61,36 @@ You can install the package with PIP, or clone the repository.
 Install the package with pip from the github repository.
 
 ```python
-pip install git+git://github.com/SocAIty/socaity_router
+# install from pypi
+pip install fast-task-api
+# install from github for the newest version
+pip install git+git://github.com/SocAIty/fast-task-api
 ```
-We will release a pypi package as soon as the first version is stable.
-
 
 # How to use
 ## Create your first service
-Use the decorator syntax @router.add_route to add a route. This syntax is similar to [fastapi](https://fastapi.tiangolo.com/tutorial/first-steps/)'s @app.get syntax.
+Use the decorator syntax @app.task_endpoint to add an endpoint. This syntax is similar to [fastapi](https://fastapi.tiangolo.com/tutorial/first-steps/)'s @app.get syntax.
 
 ```python
 from fast_task_api import FastTaskAPI, ImageFile
 
-# define the router including your provider (fastapi, runpod..)
+# define the app including your provider (fastapi, runpod..)
 app = FastTaskAPI()
 
-
 # add endpoints to your service
-@app.add_route("/predict")
+@app.task_endpoint("/predict")
 def predict(my_param1: str, my_param2: int = 0):
   return f"my_awesome_prediction {my_param1} {my_param2}"
 
-
-@app.add_route("/img2img", queue_size=10)
+@app.task_endpoint("/img2img", queue_size=10)
 def my_image_manipulator(upload_img: ImageFile):
-  img_as_numpy = np.array(upload_img)  # this returns a np.array read with cv2
+  img_as_numpy = upload_img.to_np_array() 
   # Do some hard work here...
   # img_as_numpy = img2img(img_as_numpy)
   return ImageFile().from_np_array(img_as_numpy)
 
-
 # start and run the server
-router.start()
+app.start()
 ```
 If you execute this code you should see the following page under http://localhost:8000/docs.
 <img align="center" src="docs/demo_service.png" />
@@ -101,7 +99,7 @@ If you execute this code you should see the following page under http://localhos
 
 If you have a long running task, you can use the job queue functionality. 
 ```python
-@app.post(path="/make_fries", queue_size=100)
+@app.task_endpoint(path="/make_fries", queue_size=100)
 def make_fries(job_progress: JobProgress, fries_name: str, amount: int = 1):
     job_progress.set_status(0.1, f"started new fries creation {fries_name}")
     time.sleep(1)
@@ -129,13 +127,6 @@ This makes it insanely useful for complex scenarious where you use multiple mode
 Socaity package release comes soon.
 
 
-
-#### Run sync
-If you want to run the endpoint sync, you can add ?sync=true to the endpoint, to wait for the result.
-Then the server will wait with a response until the job is finished.
-
-
-
 ### Job status and progress bars
 
 You can provide status updates by changing the values of the job_progress object. 
@@ -143,16 +134,27 @@ If you add a parameter named job_progress to the function we will pass that obje
 If then a client asks for the status of the task, he will get the messages and the process bar. This is for example in the socaity package used to provide a progress bar.
 
 ```python
-@app.add_route("/predict", queue_size=10)
+@app.task_endpoint("/predict", queue_size=10)
 def predict(job_progress: JobProgress, my_param1: str, my_param2: int = 0):
-    job_progress._message = "I am working on it"
-    job_progress._progress = 0.5
-    job_progress._message = "Still working on it. Almost done"
-    job_progress._progress = 0.8
-    return "my_awesome_prediction"
+  job_progress._message = "I am working on it"
+  job_progress._progress = 0.5
+  job_progress._message = "Still working on it. Almost done"
+  job_progress._progress = 0.8
+  return "my_awesome_prediction"
 ```
 When the return is finished, the job is marked as done and the progress bar is automatically set to 1.
 
+
+### Normal openapi (no-task) endpoints
+
+If you don't want to use the job queue functionality, you can use the ```@app.endpoint``` syntax
+```python
+@app.endpoint("/my_normal_endpoint", methods=["GET", "POST"]):
+def my_normal_endpoint(image: str, my_param2: int = 0):
+  return f"my_awesome_prediction {my_param1} {my_param2}"
+```
+This will return a regular endpoint -> No job_result object with job-id is returned.
+The method also supports file uploads.
 
 ## File uploads and files.
 
@@ -196,9 +198,13 @@ my_files = {
 }
 response = httpx.Client().post(url, files=my_files)
 ```
+Note: In case of runpod you need to convert the file to a b64 encoded string.
 
 # Backends and deploying a service
 
+You can change the provider either by setting it in the constructor or by setting the environment variable ```EXECUTION_PROVIDER="runpod"```.
+
+## Runpod
 To deploy multiple methods for a serverless provider like Runpod simply set the environment variable ```EXECUTION_PROVIDER="runpod"```.
 Or use the constructor to set the provider.
 
@@ -253,6 +259,9 @@ This doesn't mean that we don't recommend celery. Indeed it is planned to integr
 
 # Roadmap
 
+- [x] stabilize runpod deployment
+- [x] add async functionality for fastapi
+- [x] support other job-quing systems like celery
 
 
 ## Note: THE PACKAGE IS STILL IN DEVELOPMENT!

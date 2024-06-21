@@ -6,7 +6,7 @@ from fast_task_api.core.job.JobResult import JobResultFactory, JobResult
 
 class _QueueMixin:
     """
-    Adds a job queue to a router.
+    Adds a job queue to a app.
     Then instead of returning the result of the function, it returns a job object.
     Jobs are executed in threads. The user can check the status of the job and get the result.
     """

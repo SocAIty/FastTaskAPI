@@ -1,24 +1,19 @@
 import time
-
 import fastapi
 from fastapi import UploadFile as fastapiUploadFile
 from fast_task_api import FastTaskAPI
 from fast_task_api import JobProgress
-from fast_task_api.settings import EXECUTION_PROVIDER
 from fast_task_api import MultiModalFile, ImageFile, AudioFile, VideoFile
 
-import numpy as np
-
-#router = SocaityRouter(provider="runpod")
+#app = SocaityRouter(provider="runpod")
 router = FastTaskAPI(
-    provider=EXECUTION_PROVIDER,
     app=fastapi.FastAPI(
         title="FriesMaker",
         summary="Make fries from potatoes",
         version="0.0.1",
         contact={
-            "name": "w4hns1nn",
-            "url": "https://github.com/w4hns1nn",
+            "name": "SocAIty",
+            "url": "https://github.com/SocAIty",
         }),
 )
 
@@ -33,7 +28,7 @@ def make_fries(job_progress: JobProgress, fries_name: str, amount: int = 1):
     return f"Your fries {fries_name} are ready"
 
 
-@router.add_route("/make_file_fries")
+@router.task_endpoint("/make_file_fries")
 def make_fries_from_files(
         potato_one: MultiModalFile,
         potato_two: fastapiUploadFile,
@@ -42,14 +37,14 @@ def make_fries_from_files(
 
     return "fries"
 
-@router.add_route("/make_image_fries")
+@router.task_endpoint("/make_image_fries")
 def make_image_fries(potato_one: ImageFile):
     data1 = potato_one.to_cv2_img()
     print(f"recieved data {data1.shape}")
     return f"image fries {data1.shape}"
 
 
-@router.add_route("/make_audio_fries")
+@router.task_endpoint("/make_audio_fries")
 def make_audio_fries(
         potato_one: MultiModalFile,
         potato_two: AudioFile,
@@ -60,7 +55,7 @@ def make_audio_fries(
 
     return "audio_fries"
 
-@router.add_route("/make_video_fries")
+@router.task_endpoint("/make_video_fries")
 def make_video_fries(
         potato_one: MultiModalFile,
         potato_two: VideoFile,
@@ -73,6 +68,6 @@ def make_video_fries(
 if __name__ == "__main__":
     # Runpod version
     router.start(port=8000, environment="localhost")
-    # router.start(environment="serverless", port=8000)
-    # router.start(environment="localhost", port=8000)
+    # app.start(environment="serverless", port=8000)
+    # app.start(environment="localhost", port=8000)
 

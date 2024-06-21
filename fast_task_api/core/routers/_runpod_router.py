@@ -5,7 +5,7 @@ from typing import Union
 
 from fast_task_api.CONSTS import SERVER_STATUS
 from fast_task_api.core.job.JobProgress import JobProgressRunpod, JobProgress
-from fast_task_api.core.routers._SocaityRouter import _SocaityRouter
+from fast_task_api.core.routers._socaity_router import _SocaityRouter
 
 from fast_task_api.CONSTS import EXECUTION_ENVIRONMENTS
 
@@ -14,8 +14,8 @@ class SocaityRunpodRouter(_SocaityRouter):
     """
     Adds routing functionality for the runpod serverless framework.
     The runpod_handler has an additional argument "path" which is the path to the function.
-    Implementation is inspired by the fastapi router.
-    The router is a runpod handler that routes the path to the correct function.
+    Implementation is inspired by the fastapi app.
+    The app is a runpod handler that routes the path to the correct function.
     All the runpod functionality is supported, jobs return an ID. Result can be fetched with the ID.
     """
 
@@ -23,7 +23,7 @@ class SocaityRunpodRouter(_SocaityRouter):
         super().__init__(*args, **kwargs)
         self.routes = {}  # routes are organized like {"ROUTE_NAME": "ROUTE_FUNCTION"}
 
-    def add_route(
+    def task_endpoint(
             self,
             path: str = None,
             *args,
@@ -52,10 +52,10 @@ class SocaityRunpodRouter(_SocaityRouter):
         return decorator
 
     def get(self, path: str = None, queue_size: int = 1, *args, **kwargs):
-        return self.add_route(path=path, queue_size=queue_size, *args, **kwargs)
+        return self.task_endpoint(path=path, queue_size=queue_size, *args, **kwargs)
 
     def post(self, path: str = None, queue_size: int = 1, *args, **kwargs):
-        return self.add_route(path=path, queue_size=queue_size, *args, **kwargs)
+        return self.task_endpoint(path=path, queue_size=queue_size, *args, **kwargs)
 
     def _add_job_progress_to_kwargs(self, func, job, kwargs):
         """
@@ -91,7 +91,7 @@ class SocaityRunpodRouter(_SocaityRouter):
 
     def _router(self, path, job, **kwargs):
         """
-        Internal router function that routes the path to the correct function.
+        Internal app function that routes the path to the correct function.
         :param path: the path (route) to the function
         :param job: the runpod job (used for progress updates)
         :param kwargs: arguments for the function behind the path

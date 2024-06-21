@@ -11,7 +11,7 @@ from fast_task_api.core.job import JobProgress
 from fast_task_api.CONSTS import SERVER_STATUS
 from fast_task_api.core.JobManager import JobQueue
 from fast_task_api.core.job.JobResult import JobResult, JobResultFactory
-from fast_task_api.core.routers._SocaityRouter import _SocaityRouter
+from fast_task_api.core.routers._socaity_router import _SocaityRouter
 from fast_task_api.core.routers.router_mixins._queue_mixin import _QueueMixin
 
 
@@ -20,13 +20,24 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
     def __init__(self, app: Union[FastAPI, None] = None, prefix: str = "/api", *args, **kwargs):
         """
         :param app: You can pass an existing fastapi app, if you like to have multiple routers in one app
-        :param prefix: The prefix of this router for the paths
-        :param args: other fastapi router arguments
-        :param kwargs: other fastapi router keyword arguments
+        :param prefix: The prefix of this app for the paths
+        :param args: other fastapi app arguments
+        :param kwargs: other fastapi app keyword arguments
         """
         super().__init__(*args, **kwargs)
         self.job_queue = JobQueue()
         self.status = SERVER_STATUS.INITIALIZING
+
+        if app is None:
+            app = FastAPI(
+                title="FastTaskAPI",
+                summary="Create web-APIs for long-running tasks",
+                version="0.0.0",
+                contact={
+                    "name": "SocAIty",
+                    "url": "https://github.com/SocAIty",
+            })
+
         self.app = app
         self.prefix = prefix
         self.add_standard_routes()
@@ -34,6 +45,8 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
     def add_standard_routes(self):
         self.api_route(path="/job", methods=["GET", "POST"])(self.get_job)
         self.api_route(path="/status", methods=["GET", "POST"])(self.get_status)
+        # ToDo: add favicon
+        #self.api_route('/favicon.ico', include_in_schema=False)(self.favicon)
 
     def get_job(self, job_id: str, return_format: str = 'json', keep_in_memory: bool = False) -> JobResult:
         """
@@ -133,7 +146,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
 #
         #return func_with_file_upload
 
-    def add_route(
+    def task_endpoint(
             self,
             path: str,
             queue_size: int = 100,
@@ -177,21 +190,22 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
 
         return decorator
 
-    def get(self, path: str = None, queue_size: int = 1, *args, **kwargs):
-        return self.add_route(path=path, queue_size=queue_size, methods=["GET"], *args, **kwargs)
+    def get(self, path: str = None, queue_size: int = 100, *args, **kwargs):
+        return self.task_endpoint(path=path, queue_size=queue_size, methods=["GET"], *args, **kwargs)
 
-    def post(self, path: str = None, queue_size: int = 1, *args, **kwargs):
-        return self.add_route(path=path, queue_size=queue_size, methods=["POST"], *args, **kwargs)
+    def post(self, path: str = None, queue_size: int = 100, *args, **kwargs):
+        return self.task_endpoint(path=path, queue_size=queue_size, methods=["POST"], *args, **kwargs)
 
     def start(self, environment="localhost", port=8000):
         """
-        Start the FastAPI server and add this router.
+        Start the FastAPI server and add this app.
         """
         # fast API start
         if self.app is None:
             self.app = FastAPI()
 
         self.app.include_router(self)
-
+        print(f"FastTaskAPI {self.app.title} started. Use http://localhost:{port}/docs to see the API documentation.")
         import uvicorn
         uvicorn.run(self.app, host=environment, port=port)
+

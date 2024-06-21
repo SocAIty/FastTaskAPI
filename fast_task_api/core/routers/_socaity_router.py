@@ -12,12 +12,29 @@ class _SocaityRouter:
         return self.status
 
     def get_job(self, job_id: str):
+        """
+        Get the job with the given job_id if it exists.
+        :param job_id: The job id of a previously created job by requesting a task_endpoint.
+        :return:
+        """
         raise NotImplementedError("Implement in subclass")
 
     def start(self):
         raise NotImplementedError("Implement in subclass")
 
-    def add_route(
+    def add_endpoint(self, path: str = None, *args, **kwargs):
+        """
+        Add a non-task route to the app. This means the method is called directly; no job thread is created.
+        :param path:
+            In case of fastapi will be resolved as url in form http://{host:port}/{prefix}/{path}
+            In case of runpod will be resolved as url in form http://{host:port}?route={path}
+        :param args: any other arguments to configure the app
+        :param kwargs: any other keyword arguments to configure the app
+        :return:
+        """
+        raise NotImplementedError("Implement in subclass")
+
+    def task_endpoint(
             self,
             path: str = None,
             queue_size: int = 100,
@@ -25,7 +42,10 @@ class _SocaityRouter:
             **kwargs
     ):
         """
-        Adds an additional wrapper to the API path functionality.
+        This adds a task-route to the app. This means a job thread is created for each request.
+        Then the method returns an JobResult object with the job_id.
+        :param path: will be resolved as url in form http://{host:port}/{prefix}/{path}
+        :param queue_size: The maximum number of jobs that can be queued. If exceeded the job is rejected.
         """
         raise NotImplementedError("Implement in subclass")
 
