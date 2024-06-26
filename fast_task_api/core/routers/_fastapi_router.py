@@ -2,11 +2,11 @@ import functools
 import inspect
 from typing import Union
 
-from multimodal_files.file_conversion import convert_to_upload_file_type
+from media_toolkit.file_conversion import convert_to_upload_file_type
 
 from fastapi import APIRouter, FastAPI
 from fast_task_api.compatibility.upload import (convert_param_type_to_fast_api_upload_file,
-                                                 is_param_multimodal_file)
+                                                is_param_media_toolkit_file)
 from fast_task_api.core.job import JobProgress
 from fast_task_api.CONSTS import SERVER_STATUS
 from fast_task_api.core.JobManager import JobQueue
@@ -16,7 +16,6 @@ from fast_task_api.core.routers.router_mixins._queue_mixin import _QueueMixin
 
 
 class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
-
     def __init__(self, app: Union[FastAPI, None] = None, prefix: str = "/api", *args, **kwargs):
         """
         :param app: You can pass an existing fastapi app, if you like to have multiple routers in one app
@@ -86,7 +85,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
     def _handle_file_uploads(self, func: callable) -> callable:
         """
         Modify the function signature for fastapi to handle file uploads.
-        Parse/Read the starlette.MultiModalFile and give it as read socaity MultiModalFile to the function while execution.
+        Parse/Read the starlette.MediaFile and give it as read socaity MediaFile to the function while execution.
         """
 
         # original func parameter names: needed multiple times
@@ -96,7 +95,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
         upload_params = {
             param.name: param.annotation
             for param in original_func_parameters
-            if is_param_multimodal_file(param)
+            if is_param_media_toolkit_file(param)
         }
 
         def read_file_if_is_upload_file(param_name: str, data):
@@ -115,7 +114,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
             org_func_names = [param.name for param in original_func_parameters]
             nkwargs = {org_func_names[i]: arg for i, arg in enumerate(args)}
             nkwargs.update(kwargs)
-            # convert to socaity MultiModalFile if it is a file
+            # convert to socaity MediaFile if it is a file
             n_kwargs = {key: read_file_if_is_upload_file(key, value) for key, value in kwargs.items()}
 
             return func(**n_kwargs)
@@ -123,7 +122,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
         # replace signature with fastapi signature
         new_sig = inspect.signature(func).replace(parameters=[
             convert_param_type_to_fast_api_upload_file(param)
-            if is_param_multimodal_file(param) else param
+            if is_param_media_toolkit_file(param) else param
             for param in original_func_parameters
         ])
         file_upload_wrapper.__signature__ = new_sig

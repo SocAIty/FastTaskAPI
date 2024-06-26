@@ -3,7 +3,7 @@ import fastapi
 from fastapi import UploadFile as fastapiUploadFile
 from fast_task_api import FastTaskAPI
 from fast_task_api import JobProgress
-from fast_task_api import MultiModalFile, ImageFile, AudioFile, VideoFile
+from fast_task_api import MediaFile, ImageFile, AudioFile, VideoFile
 
 #app = SocaityRouter(provider="runpod")
 router = FastTaskAPI(
@@ -30,7 +30,7 @@ def make_fries(job_progress: JobProgress, fries_name: str, amount: int = 1):
 
 @router.task_endpoint("/make_file_fries")
 def make_fries_from_files(
-        potato_one: MultiModalFile,
+        potato_one: MediaFile,
         potato_two: fastapiUploadFile,
     ):
     potato_one_content = potato_one.to_bytes()
@@ -46,7 +46,7 @@ def make_image_fries(potato_one: ImageFile):
 
 @router.task_endpoint("/make_audio_fries")
 def make_audio_fries(
-        potato_one: MultiModalFile,
+        potato_one: MediaFile,
         potato_two: AudioFile,
     ):
 
@@ -57,7 +57,7 @@ def make_audio_fries(
 
 @router.task_endpoint("/make_video_fries")
 def make_video_fries(
-        potato_one: MultiModalFile,
+        potato_one: MediaFile,
         potato_two: VideoFile,
     ):
     potato_one_content = potato_one.content

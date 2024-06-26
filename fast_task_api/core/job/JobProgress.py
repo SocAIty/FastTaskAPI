@@ -23,5 +23,5 @@ class JobProgressRunpod(JobProgress):
         import runpod
         runpod.serverless.progress_update(
             self.runpod_job,
-            f"Progress: {self._progress} Message: {self._message}"
+            f"Progress: {int(self._progress)} Message: {self._message}"
         )

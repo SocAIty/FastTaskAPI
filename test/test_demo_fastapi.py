@@ -1,23 +1,11 @@
-import fastapi
 from fast_task_api import FastTaskAPI
 from fast_task_api import JobProgress
-from fast_task_api.settings import EXECUTION_PROVIDER
 from fast_task_api import ImageFile
 import time
 import numpy as np
 
 # define the app including your provider (fastapi, runpod..)
-app = FastTaskAPI(
-    #provider=EXECUTION_PROVIDER,
-    #app=fastapi.FastAPI(
-    #    title="Img2Img",
-    #    summary="Super good image to image conversion",
-    #    version="0.0.1",
-    #    contact={
-    #        "name": "w4hns1nn",
-    #        "url": "https://github.com/w4hns1nn",
-    #    }),
-)
+app = FastTaskAPI()
 
 # add endpoints to your service
 @app.task_endpoint("/predict")

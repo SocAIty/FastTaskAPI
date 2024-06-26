@@ -52,7 +52,7 @@ The syntax is oriented by the simplicity of fastapi. Other hazards are taken car
   - Including progress bars.
 - File support, also for serverless providers like [Runpod](https://docs.runpod.io/serverless/workers/handlers/overview) 
   - Simplified sending files to the services with [fastSDK](https://github.com/SocAIty/fastSDK) 
-  - One line file response with [multimodal-files](https://github.com/SocAIty/multimodal-files) including images, audio, video and more.
+  - One line file response with [MediaToolkit](https://github.com/SocAIty/multimodal-files) including images, audio, video and more.
 - Integration: integrates neatly into the SOCAITY ecosystem for running AI services like python functions with our [Client](https://github.com/SocAIty/socaity-client)/[fastSDK](https://github.com/SocAIty/socaity).
 - Monitoring server state.
 
@@ -161,14 +161,17 @@ The library supports file uploads out of the box.
 Use the parameter type hints in your method definition to get the file.
 
 ```python
-from fast_task_api import MultiModalFile, ImageFile, AudioFile, VideoFile
+from fast_task_api import MediaFile, ImageFile, AudioFile, VideoFile
 
-def my_upload(anyfile: MultiModalFile):
+@app.task_endpoint("/my_upload")
+def my_upload(anyfile: MediaFile):
     return anyfile.content
 ```
 FastTaskAPI supports all file-types of [multimodal-files](https://github.com/SocAIty/multimodal-files). This includes common file types like: ImageFile, AudioFile and VideoFile.
 ```python
 from fast_task_api import ImageFile, AudioFile, VideoFile
+
+@app.task_endpoint("/my_file_upload")
 def my_upload_image(image: ImageFile, audio: AudioFile, video: VideoFile):
     image_as_np_array = np.array(image)
 ```
@@ -176,7 +179,7 @@ You can call the endpoints, either with bytes or b64 encoded strings.
 
 ### Sending requests (and files) to the service with FastSDK
 
-FastSDK also natively support mutlimodal-files and for this reason it natively supports file up/downloads.
+FastSDK also natively support MediaFiles and for this reason it natively supports file up/downloads.
 Once you have added the service in FastSDK you can call it like a python function
 ```
 mysdk = mySDK() # follow the fastSDK tutorial to set up correctly.

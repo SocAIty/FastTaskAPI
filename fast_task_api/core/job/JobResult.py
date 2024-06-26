@@ -3,7 +3,7 @@ from io import BytesIO
 from typing import Optional, Union, Any
 
 from pydantic import BaseModel
-from fast_task_api.compatibility.upload import is_param_multimodal_file
+from fast_task_api.compatibility.upload import is_param_media_toolkit_file
 from fast_task_api.core.job import InternalJob
 from fast_task_api.core.job.InternalJob import JOB_STATUS
 
@@ -44,9 +44,9 @@ class JobResultFactory:
         execution_started_at = format_date(ij.execution_started_at)
         execution_finished_at = format_date(ij.execution_finished_at)
 
-        # if the internal job returned a multimodal file, convert it to a json serializable FileResult
+        # if the internal job returned a media-toolkit file, convert it to a json serializable FileResult
         result = ij.result
-        if is_param_multimodal_file(ij.result):
+        if is_param_media_toolkit_file(ij.result):
             result = FileResult(**result.to_json())
 
         return JobResult(

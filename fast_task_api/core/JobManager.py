@@ -1,3 +1,4 @@
+import traceback
 from datetime import datetime
 import time
 import threading
@@ -67,6 +68,7 @@ class JobQueue:
             job.result = None
             job.job_progress.set_status(1.0, str(e))
             job.status = JOB_STATUS.FAILED
+            print(traceback.format_exc())
 
         job.execution_finished_at = datetime.utcnow()
         # store result in results. Necessary in threading because thread itself cannot easily return values

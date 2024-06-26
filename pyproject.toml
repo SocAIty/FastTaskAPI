@@ -16,7 +16,7 @@ dependencies = [
     "uvicorn",
     "fastapi",
     "runpod>=1.6.0",
-    "multimodal-files>=0.0.0"
+    "media-toolkit>=0.0.0"
 ]
 
 [project.urls]
@@ -28,5 +28,5 @@ full = [
     "uvicorn",
     "fastapi",
     "runpod>=1.6.0",
-    "multimodal-files>=0.0.0"
+    "media-toolkit>=0.0.0"
 ]
