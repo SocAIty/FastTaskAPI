@@ -264,7 +264,7 @@ This doesn't mean that we don't recommend celery. Indeed it is planned to integr
 - [x] stabilize runpod deployment
 - [x] streaming support
 - [x] add async functionality for fastapi
-- [x] support other job-quing systems like celery
+- [x] support other job-queuing systems like celery
 
 
 ## Note: THE PACKAGE IS STILL IN DEVELOPMENT!

@@ -77,7 +77,7 @@ class JobQueue:
     def process_jobs_in_background(self):
         while True:
             if len(self.queue) == 0 and len(self.in_progress) == 0:
-                time.sleep(1)
+                time.sleep(1)  # server is idle
                 continue
 
             # create new jobs from queue
@@ -103,9 +103,9 @@ class JobQueue:
                     self.in_progress.remove(job_thread)
 
                     self.results.append(j)
-
+            # give threads time to breath
+            time.sleep(0.01)
             # ToDo: remove jobs from memory which are long finished and results not retrieved
-
 
     def get_job(self, job_id: str, keep_in_memory: bool =False) -> Union[InternalJob, None]:
         """
