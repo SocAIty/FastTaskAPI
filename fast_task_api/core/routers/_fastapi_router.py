@@ -70,16 +70,12 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
     @staticmethod
     def _job_progress_signature_change(func: callable) -> callable:
         # either param type is JobProgress or the name is job_progress
-        for param in inspect.signature(func).parameters.values():
-            if param.annotation == JobProgress or param.name == "job_progress":
-                # exclude the job_progress parameter from the signature
-                # note that because the queue_router_decorator_func was used before,
-                # the job_progress param was already registered.
-                new_sig = inspect.signature(func).replace(parameters=[
-                    p for p in inspect.signature(func).parameters.values()
-                    if p.name != "job_progress" or p.annotation != JobProgress
-                ])
-                func.__signature__ = new_sig
+        sig_params = inspect.signature(func).parameters.values()
+        new_sig = inspect.signature(func).replace(parameters=[
+            p for p in sig_params
+            if p.name != "job_progress" and p.annotation != JobProgress
+        ])
+        func.__signature__ = new_sig
         return func
 
     def _handle_file_uploads(self, func: callable) -> callable:
