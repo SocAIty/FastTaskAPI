@@ -16,7 +16,8 @@ dependencies = [
     "uvicorn",
     "fastapi",
     "runpod>=1.6.0",
-    "media-toolkit>=0.0.0"
+    "media-toolkit>=0.0.0",
+    "singleton-decorator==1.0.0"
 ]
 
 [project.urls]
@@ -28,5 +29,6 @@ full = [
     "uvicorn",
     "fastapi",
     "runpod>=1.6.0",
-    "media-toolkit>=0.0.0"
+    "media-toolkit>=0.0.0",
+    "singleton-decorator==1.0.0"
 ]
