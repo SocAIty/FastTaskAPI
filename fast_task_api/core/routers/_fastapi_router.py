@@ -7,7 +7,7 @@ from media_toolkit.file_conversion import convert_to_upload_file_type
 from fastapi import APIRouter, FastAPI
 from fast_task_api.compatibility.upload import (convert_param_type_to_fast_api_upload_file,
                                                 is_param_media_toolkit_file)
-from fast_task_api.core.job import JobProgress
+
 from fast_task_api.CONSTS import SERVER_STATUS
 from fast_task_api.core.JobManager import JobQueue
 from fast_task_api.core.job.JobResult import JobResult, JobResultFactory
@@ -73,7 +73,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
         sig_params = inspect.signature(func).parameters.values()
         new_sig = inspect.signature(func).replace(parameters=[
             p for p in sig_params
-            if p.name != "job_progress" and p.annotation != JobProgress
+            if p.name != "job_progress" and "JobProgress" not in p.annotation.__name__
         ])
         func.__signature__ = new_sig
         return func

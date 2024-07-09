@@ -1,3 +1,4 @@
+import inspect
 import traceback
 from datetime import datetime
 import time
@@ -7,6 +8,7 @@ from typing import Union
 from singleton_decorator import singleton
 
 from fast_task_api.core.job.InternalJob import InternalJob, JOB_STATUS
+from fast_task_api.core.job.JobProgress import JobProgress
 
 
 @singleton
@@ -56,8 +58,9 @@ class JobQueue:
         job.status = JOB_STATUS.PROCESSING
 
         # if function has a param with the type JobProgress in the function signature, pass the job_progress object
-        if "job_progress" in job.job_function.__code__.co_varnames:
-            job.job_params["job_progress"] = job.job_progress
+        for p in inspect.signature(job.job_function).parameters.values():
+            if p.name == "job_progress" or "JobProgress" in p.annotation.__name__:
+                job.job_params[p.name] = job.job_progress
 
         try:
             job.result = job.job_function(**job.job_params)
