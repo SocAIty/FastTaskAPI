@@ -2,7 +2,7 @@ import functools
 import inspect
 from typing import Union
 
-from media_toolkit.file_conversion import convert_to_upload_file_type
+from media_toolkit.utils.file_conversion import convert_to_upload_file_type
 
 from fastapi import APIRouter, FastAPI
 from fast_task_api.compatibility.upload import (convert_param_type_to_fast_api_upload_file,
