@@ -5,7 +5,16 @@ class _SocaityRouter:
     """
     Base class for all routers.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(
+            self, title: str = "FastTaskAPI", summary: str = "Create web-APIs for long-running tasks", *args, **kwargs
+    ):
+        if title is None:
+            title = "FastTaskAPI"
+        if summary is None:
+            summary = "Create web-APIs for long-running tasks"
+
+        self.title = title
+        self.summary = summary
         self.status = SERVER_STATUS.INITIALIZING
 
     def get_status(self) -> SERVER_STATUS:

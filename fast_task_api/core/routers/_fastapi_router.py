@@ -1,37 +1,43 @@
 import functools
 import inspect
 from typing import Union
-
-from media_toolkit.file_conversion import convert_to_upload_file_type
-
 from fastapi import APIRouter, FastAPI
+
 from fast_task_api.compatibility.upload import (convert_param_type_to_fast_api_upload_file,
                                                 is_param_media_toolkit_file)
-from fast_task_api.core.job import JobProgress
+from media_toolkit import media_from_any
 from fast_task_api.CONSTS import SERVER_STATUS
 from fast_task_api.core.JobManager import JobQueue
 from fast_task_api.core.job.JobResult import JobResult, JobResultFactory
 from fast_task_api.core.routers._socaity_router import _SocaityRouter
 from fast_task_api.core.routers.router_mixins._queue_mixin import _QueueMixin
 
+import importlib.metadata
+
 
 class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
-    def __init__(self, app: Union[FastAPI, None] = None, prefix: str = "/api", *args, **kwargs):
+    def __init__(
+            self,
+            title: str = "FastTaskAPI",
+            summary: str = "Create web-APIs for long-running tasks",
+            app: Union[FastAPI, None] = None,
+            prefix: str = "/api",
+            *args, **kwargs):
         """
+        :param title: The title of the app. (Like FastAPI(title))
+        :param summary: The summary of the app. (Like FastAPI(summary))
         :param app: You can pass an existing fastapi app, if you like to have multiple routers in one app
         :param prefix: The prefix of this app for the paths
         :param args: other fastapi app arguments
         :param kwargs: other fastapi app keyword arguments
         """
-        super().__init__(*args, **kwargs)
+        super().__init__(title=title, summary=summary, *args, **kwargs)
         self.job_queue = JobQueue()
         self.status = SERVER_STATUS.INITIALIZING
-
         if app is None:
             app = FastAPI(
-                title="FastTaskAPI",
-                summary="Create web-APIs for long-running tasks",
-                version="0.0.0",
+                title=self.title,
+                summary=self.summary,
                 contact={
                     "name": "SocAIty",
                     "url": "https://github.com/SocAIty",
@@ -40,12 +46,21 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
         self.app = app
         self.prefix = prefix
         self.add_standard_routes()
+        self._orig_openapi_func = self.app.openapi
+        self.app.openapi = self.custom_openapi
 
     def add_standard_routes(self):
         self.api_route(path="/job", methods=["GET", "POST"])(self.get_job)
         self.api_route(path="/status", methods=["GET", "POST"])(self.get_status)
         # ToDo: add favicon
         #self.api_route('/favicon.ico', include_in_schema=False)(self.favicon)
+
+    def custom_openapi(self):
+        if not self.app.openapi_schema:
+            self._orig_openapi_func()
+        version = importlib.metadata.version("fast-task-api")
+        self.app.openapi_schema["info"]["fast-task-api"] = version
+        return self.app.openapi_schema
 
     def get_job(self, job_id: str, return_format: str = 'json', keep_in_memory: bool = False) -> JobResult:
         """
@@ -73,7 +88,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
         sig_params = inspect.signature(func).parameters.values()
         new_sig = inspect.signature(func).replace(parameters=[
             p for p in sig_params
-            if p.name != "job_progress" and p.annotation != JobProgress
+            if p.name != "job_progress" and "JobProgress" not in p.annotation.__name__
         ])
         func.__signature__ = new_sig
         return func
@@ -98,9 +113,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
             # check if we have the file in our list
             my_data_type = upload_params.get(param_name, None)
             if my_data_type is not None:
-                return convert_to_upload_file_type(data, my_data_type)
-
-                # return starlette_uploadfile_to_socaity_upload_file(data, my_data_type)
+                return media_from_any(data, my_data_type)
             # if is not a file, return as is
             return data
 
@@ -125,21 +138,6 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
         func.__signature__ = new_sig
 
         return file_upload_wrapper
-
-        ## modify execution to handle file uploads in the same way as in runpod
-        #def func_with_file_upload(*args, **kwargs):
-        #    for param in inspect.signature(func).parameters.values():
-        #        if param.annotation == compatibility.UploadDataType:
-        #            file = kwargs[param.name]
-        #            if isinstance(file, str):
-        #                try:
-        #                    decoded_file = compatibility.base64_to_file(file, param.annotation)
-        #                    kwargs[param.name] = decoded_file
-        #                except Exception as e:
-        #                    logging.error(f"Error decoding file {param.name} in upload. We pass it as is. Error: {e}")
-        #    return func(*args, **kwargs)
-#
-        #return func_with_file_upload
 
     @functools.wraps(APIRouter.api_route)
     def endpoint(self, path: str, methods: list[str] = None, *args, **kwargs):

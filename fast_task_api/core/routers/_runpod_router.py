@@ -1,13 +1,14 @@
 import functools
+import importlib
 import inspect
 from typing import Union
-
 
 from fast_task_api.CONSTS import SERVER_STATUS
 from fast_task_api.core.job.JobProgress import JobProgressRunpod, JobProgress
 from fast_task_api.core.routers._socaity_router import _SocaityRouter
 
-from fast_task_api.CONSTS import EXECUTION_ENVIRONMENTS
+from fast_task_api.CONSTS import FTAPI_DEPLOYMENTS
+from fast_task_api.settings import FTAPI_DEPLOYMENT
 
 
 class SocaityRunpodRouter(_SocaityRouter):
@@ -19,8 +20,8 @@ class SocaityRunpodRouter(_SocaityRouter):
     All the runpod functionality is supported, jobs return an ID. Result can be fetched with the ID.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, title: str = "FastTaskAPI for ", summary: str = None, *args, **kwargs):
+        super().__init__(title=title, summary=summary, *args, **kwargs)
         self.routes = {}  # routes are organized like {"ROUTE_NAME": "ROUTE_FUNCTION"}
 
     def task_endpoint(
@@ -86,7 +87,6 @@ class SocaityRunpodRouter(_SocaityRouter):
         """
         Params of the function that are annotated with UploadDataType will be replaced with the file content.
         """
-        raise NotImplementedError("File uploads are not implemented for runpod yet.")
         return kwargs
 
     def _router(self, path, job, **kwargs):
@@ -140,20 +140,52 @@ class SocaityRunpodRouter(_SocaityRouter):
 
         return self._router(route, job, **inputs)
 
-    def start(self, environment: Union[EXECUTION_ENVIRONMENTS, str] = EXECUTION_ENVIRONMENTS.SERVERLESS, port=8000):
+    def start_runpod_serverless_localhost(self, port):
+        # add the -rp_serve_api to the command line arguments to allow debugging
+        import sys
+        sys.argv.append("--rp_serve_api")
+        sys.argv.extend(["--rp_api_port", str(port)])
+
+        # overwrite runpod variables. Little hacky but runpod does not expose the variables in a nice way.
+        import runpod.serverless
+        from runpod.serverless.modules import rp_fastapi
+        rp_fastapi.TITLE = self.title + " " + rp_fastapi.TITLE
+        rp_fastapi.DESCRIPTION = self.summary + " " + rp_fastapi.DESCRIPTION
+        desc = '''\
+                        In input declare your path as route for the function. Other parameters follow in the input as usual.
+                        The FastTaskAPI router will use the path argument to route to the correct function declared with 
+                        @task_endpoint(path="your_path").
+                        { "input": { "path": "your_path", "your_other_args": "your_other_args" } }
+                    '''
+        rp_fastapi.RUN_DESCRIPTION = desc + "\n" + rp_fastapi.RUN_DESCRIPTION
+
+        class WorkerAPIWithModifiedInfo(rp_fastapi.WorkerAPI):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self._orig_openapi_func = self.rp_app.openapi
+                self.rp_app.openapi = self.custom_openapi
+
+            def custom_openapi(self):
+                if not self.rp_app.openapi_schema:
+                    self._orig_openapi_func()
+                version = importlib.metadata.version("fast-task-api")
+                self.rp_app.openapi_schema["info"]["fast-task-api"] = version
+                self.rp_app.openapi_schema["info"]["runpod"] = rp_fastapi.runpod_version
+                return self.rp_app.openapi_schema
+
+        rp_fastapi.WorkerAPI = WorkerAPIWithModifiedInfo
+
+        runpod.serverless.start({"handler": self.handler})
+
+    def start(self, environment: Union[FTAPI_DEPLOYMENTS, str] = FTAPI_DEPLOYMENT, port=8000):
         if type(environment) is str:
-            environment = EXECUTION_ENVIRONMENTS(environment)
+            environment = FTAPI_DEPLOYMENTS(environment)
 
         if environment == environment.LOCALHOST:
-            # add the -rp_serve_api to the command line arguments to allow debugging
-            import sys
-            sys.argv.append("--rp_serve_api")
-
-            import runpod.serverless
-            runpod.serverless.start({"handler": self.handler})
-
+            self.start_runpod_serverless_localhost(port=port)
         elif environment == environment.SERVERLESS:
             import runpod.serverless
             runpod.serverless.start({"handler": self.handler})
         else:
             raise Exception(f"Not implemented for environment {environment}")
+
