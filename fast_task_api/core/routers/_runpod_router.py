@@ -1,14 +1,19 @@
 import functools
 import importlib
 import inspect
+from datetime import datetime
 from typing import Union
 
 from fast_task_api.CONSTS import SERVER_STATUS
+from fast_task_api.compatibility.upload import is_param_media_toolkit_file
+from fast_task_api.core.job.InternalJob import JOB_STATUS
 from fast_task_api.core.job.JobProgress import JobProgressRunpod, JobProgress
+from fast_task_api.core.job.JobResult import JobResult
 from fast_task_api.core.routers._socaity_router import _SocaityRouter
 
 from fast_task_api.CONSTS import FTAPI_DEPLOYMENTS
 from fast_task_api.settings import FTAPI_DEPLOYMENT
+from media_toolkit import media_from_any
 
 
 class SocaityRunpodRouter(_SocaityRouter):
@@ -87,6 +92,21 @@ class SocaityRunpodRouter(_SocaityRouter):
         """
         Params of the function that are annotated with UploadDataType will be replaced with the file content.
         """
+        # original func parameter names: needed multiple times
+        original_func_parameters = inspect.signature(func).parameters
+        # create a dict to store the params that are UploadFiles
+        # this is used to later map the file while reading
+        upload_params = {
+            param.name: param.annotation
+            for param in original_func_parameters.values()
+            if is_param_media_toolkit_file(param)
+        }
+
+        # convert to media files
+        for key, value in upload_params.items():
+            if key in kwargs:
+                kwargs[key] = media_from_any(kwargs[key], media_file_type=original_func_parameters[key].annotation)
+
         return kwargs
 
     def _router(self, path, job, **kwargs):
@@ -100,7 +120,6 @@ class SocaityRunpodRouter(_SocaityRouter):
 
         if len(path) > 0 and path[0] == "/":
             path = path[1:]
-
         route_function = self.routes.get(path, None)
         if route_function is None:
             raise Exception(f"Route {path} not found")
@@ -118,10 +137,28 @@ class SocaityRunpodRouter(_SocaityRouter):
         kwargs = self._handle_file_uploads(route_function, **kwargs)
 
         # catch errors and display readable error messages
+        start_time = datetime.utcnow()
+        result = JobResult(id=job['id'], execution_started_at=start_time.strftime("%Y-%m-%dT%H:%M:%S.%f%z"))
+
         try:
-            return route_function(**kwargs)
+            # execute the function
+            res = route_function(**kwargs)
+            if is_param_media_toolkit_file(res):
+                res = res.to_json()
+            result.result = res
+            result.status = JOB_STATUS.FINISHED
         except Exception as e:
-            raise Exception(f"Error in path {path}: {e}")
+            result.status = JOB_STATUS.FAILED
+            result.message = str(e)
+        finally:
+            result.execution_finished_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+
+        #ret_job.refresh_job_url = f"/job?job_id={ret_job.id}"
+
+        #if return_format != 'json':
+        #    ret_job = JobResultFactory.gzip_job_result(ret_job)
+
+        return result
 
     def handler(self, job):
         """

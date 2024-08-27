@@ -36,7 +36,7 @@ Creating services for long-running tasks is hard.
 - Serverless deployments like runpod often DO NOT provide routing functionality. This router works in this conditions.
 - Scaling AI services is hard.
 - Streaming services (for example for generative models) is complicated to setup.
-
+- Same Syntax for all kind of hosting providers and services.
 
 This package solves these problems, by providing a simple well-known interface to deploy AI services anywhere.</br>
 The syntax is oriented by the simplicity of fastapi. Other hazards are taken care of by our router.
@@ -52,7 +52,7 @@ The syntax is oriented by the simplicity of fastapi. Other hazards are taken car
   - Including progress bars.
 - File support, also for serverless providers like [Runpod](https://docs.runpod.io/serverless/workers/handlers/overview) 
   - Simplified sending files to the services with [fastSDK](https://github.com/SocAIty/fastSDK) 
-  - One line file response with [MediaToolkit](https://github.com/SocAIty/multimodal-files) including images, audio, video and more.
+  - One line file response with [MediaToolkit](https://github.com/SocAIty/media-toolkit) including images, audio, video and more.
 - Integration: integrates neatly into the SOCAITY ecosystem for running AI services like python functions with our [Client](https://github.com/SocAIty/socaity-client)/[fastSDK](https://github.com/SocAIty/socaity).
 - Monitoring server state.
 
@@ -167,7 +167,7 @@ from fast_task_api import MediaFile, ImageFile, AudioFile, VideoFile
 def my_upload(anyfile: MediaFile):
     return anyfile.content
 ```
-FastTaskAPI supports all file-types of [multimodal-files](https://github.com/SocAIty/multimodal-files). This includes common file types like: ImageFile, AudioFile and VideoFile.
+FastTaskAPI supports all file-types of [media-toolkit](https://github.com/SocAIty/media-toolkit). This includes common file types like: ImageFile, AudioFile and VideoFile.
 ```python
 from fast_task_api import ImageFile, AudioFile, VideoFile
 
@@ -179,7 +179,7 @@ You can call the endpoints, either with bytes or b64 encoded strings.
 
 ### Sending requests (and files) to the service with FastSDK
 
-FastSDK also natively support MediaFiles and for this reason it natively supports file up/downloads.
+FastSDK also supports MediaFiles and for this reason it natively supports file up/downloads.
 Once you have added the service in FastSDK you can call it like a python function
 ```
 mysdk = mySDK() # follow the fastSDK tutorial to set up correctly.
@@ -202,28 +202,47 @@ response = httpx.Client().post(url, files=my_files)
 ```
 Note: In case of runpod you need to convert the file to a b64 encoded string.
 
-# Backends and deploying a service
-
-You can change the provider either by setting it in the constructor or by setting the environment variable ```EXECUTION_PROVIDER="runpod"```.
-
-## Runpod
-To deploy multiple methods for a serverless provider like Runpod simply set the environment variable ```EXECUTION_PROVIDER="runpod"```.
-Or use the constructor to set the provider.
-
+### Sending file with URLs
+One property of media-toolkit is, that it support files from URLs. 
+Thus instead of sending a file directly (as bytes) to the endpoints, you can also send a URL to the file location.
 ```python
-router = SocaityRouter(provider="runpod")
+my_files = {
+  "image": "https:/my_cloud_storage/my_image_file.png"
+  ...
+}
+response = httpx.Client().post(url, files=my_files)
 ```
-Set environment variables to determine the deployment target or provide the values in the constructor.
-Default is ```EXECUTION_ENVIORNMENT="localhost"``` and ```EXECUTION_PROVIDER="fastapi"```.
-Possible values are ```"local"```, ```"serverless"```, ```"hosted"```, ```"decentralized"``` and ```"fastapi"```, ```"runpod"```
 
-To deploy to runpod all you have to do is to write a simple docker file to deploy the service. 
-No custom handler writing is required.
+### Using a cloud storage provider for file up and download
+
+You can specify a cloud_storage provider.
+Then instead of sending the file directly back to the client, the file is uploaded to your storage provider and a download link is returned.
+```python
+
+```
+
+
+
+# Deploying the service with different backends (hosting providers)
+
+You can change the backend (hosting provider) either by setting it in the constructor or by setting the environment variable.
+```dockerfile 
+# Options: "fastapi", "runpod"
+ENV FTAPI_BACKEND="runpod"
+# Options: "localhost", "serverless"
+ENV FTAPI_DEPLOYMENT="serverless"
+# Start the server
+CMD [ "python", "-u", "server.py"]
+```
 
 
 ## Runpod
-It is not required to write a [handler](https://docs.runpod.io/serverless/workers/handlers/overview) function anymore. The socaity router magic handles it :D
-Just write a simple docker file and deploy it to runpod. 
+It is not required to write a [handler](https://docs.runpod.io/serverless/workers/handlers/overview) function anymore. The fast-task-api magic handles it :D
+This brings you additional benefits:
+- Same syntax as with fastapi
+- Better file handling
+
+
 
 
 ## Locally
