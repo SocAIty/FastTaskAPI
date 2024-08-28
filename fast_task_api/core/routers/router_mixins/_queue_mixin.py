@@ -10,7 +10,7 @@ class _QueueMixin:
     Then instead of returning the result of the function, it returns a job object.
     Jobs are executed in threads. The user can check the status of the job and get the result.
     """
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.job_queue = JobQueue()
         self.status = SERVER_STATUS.INITIALIZING
 

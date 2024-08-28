@@ -12,7 +12,7 @@ from fast_task_api.core.job.JobResult import JobResult
 from fast_task_api.core.routers._socaity_router import _SocaityRouter
 
 from fast_task_api.CONSTS import FTAPI_DEPLOYMENTS
-from fast_task_api.settings import FTAPI_DEPLOYMENT
+from fast_task_api.settings import FTAPI_DEPLOYMENT, FTAPI_PORT
 from media_toolkit import media_from_any
 
 
@@ -214,15 +214,15 @@ class SocaityRunpodRouter(_SocaityRouter):
 
         runpod.serverless.start({"handler": self.handler})
 
-    def start(self, environment: Union[FTAPI_DEPLOYMENTS, str] = FTAPI_DEPLOYMENT, port=8000):
-        if type(environment) is str:
-            environment = FTAPI_DEPLOYMENTS(environment)
-
-        if environment == environment.LOCALHOST:
+    def start(self, deployment: Union[FTAPI_DEPLOYMENTS, str] = FTAPI_DEPLOYMENT,
+              port: int = FTAPI_PORT, *args, **kwargs):
+        if type(deployment) is str:
+            deployment = FTAPI_DEPLOYMENTS(deployment)
+        if deployment == deployment.LOCALHOST:
             self.start_runpod_serverless_localhost(port=port)
-        elif environment == environment.SERVERLESS:
+        elif deployment == deployment.SERVERLESS:
             import runpod.serverless
             runpod.serverless.start({"handler": self.handler})
         else:
-            raise Exception(f"Not implemented for environment {environment}")
+            raise Exception(f"Not implemented for environment {deployment}")
 

@@ -1,4 +1,7 @@
-from fast_task_api.CONSTS import SERVER_STATUS
+from typing import Union
+
+from fast_task_api.CONSTS import SERVER_STATUS, FTAPI_DEPLOYMENTS
+from fast_task_api.settings import FTAPI_DEPLOYMENT
 
 
 class _SocaityRouter:
@@ -28,7 +31,7 @@ class _SocaityRouter:
         """
         raise NotImplementedError("Implement in subclass")
 
-    def start(self):
+    def start(self, deployment: Union[FTAPI_DEPLOYMENTS, str] = FTAPI_DEPLOYMENT, port: int = 8000, *args, **kwargs):
         raise NotImplementedError("Implement in subclass")
 
     def endpoint(self, path: str = None, *args, **kwargs):

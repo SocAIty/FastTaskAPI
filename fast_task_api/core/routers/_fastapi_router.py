@@ -5,8 +5,9 @@ from fastapi import APIRouter, FastAPI
 
 from fast_task_api.compatibility.upload import (convert_param_type_to_fast_api_upload_file,
                                                 is_param_media_toolkit_file)
+from fast_task_api.settings import FTAPI_DEPLOYMENT, FTAPI_PORT, FTAPI_HOST
 from media_toolkit import media_from_any
-from fast_task_api.CONSTS import SERVER_STATUS
+from fast_task_api.CONSTS import SERVER_STATUS, FTAPI_DEPLOYMENTS
 from fast_task_api.core.JobManager import JobQueue
 from fast_task_api.core.job.JobResult import JobResult, JobResultFactory
 from fast_task_api.core.routers._socaity_router import _SocaityRouter
@@ -31,9 +32,23 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
         :param args: other fastapi app arguments
         :param kwargs: other fastapi app keyword arguments
         """
-        super().__init__(title=title, summary=summary, *args, **kwargs)
+        # INIT upper classes
+        # inspect the APIRouter params and init with only the ones that are needed
+        pams = inspect.signature(APIRouter.__init__).parameters
+        api_router_init_kwargs = {
+            key: kwargs[key]
+            for key in pams.keys()
+            if key in kwargs
+        }
+        # need to do each init separately instead of super().__init__(*args, **kwargs) to avoid conflicts with APIRouter
+        APIRouter.__init__(self, **api_router_init_kwargs)
+        _SocaityRouter.__init__(self=self, title=title, summary=summary, *args, **kwargs)
+        _QueueMixin.__init__(self, *args, **kwargs)
+
         self.job_queue = JobQueue()
         self.status = SERVER_STATUS.INITIALIZING
+
+        # Configuring the fastapi app and router
         if app is None:
             app = FastAPI(
                 title=self.title,
@@ -195,7 +210,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
     def post(self, path: str = None, queue_size: int = 100, *args, **kwargs):
         return self.task_endpoint(path=path, queue_size=queue_size, methods=["POST"], *args, **kwargs)
 
-    def start(self, environment="localhost", port=8000):
+    def start(self, port: int = FTAPI_PORT, host: str = FTAPI_HOST, *args, **kwargs):
         """
         Start the FastAPI server and add this app.
         """
@@ -204,7 +219,11 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
             self.app = FastAPI()
 
         self.app.include_router(self)
-        print(f"FastTaskAPI {self.app.title} started. Use http://localhost:{port}/docs to see the API documentation.")
+
+        # print helping statement
+        print_host = "localhost" if host == "0.0.0.0" or host is None else host
+        print(f"FastTaskAPI {self.app.title} started. Use http://{print_host}:{port}/docs to see the API documentation.")
+        # start uvicorn
         import uvicorn
-        uvicorn.run(self.app, host=environment, port=port)
+        uvicorn.run(self.app, host=host, port=port)
 

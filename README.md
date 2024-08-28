@@ -223,31 +223,47 @@ Then instead of sending the file directly back to the client, the file is upload
 
 
 
-# Deploying the service with different backends (hosting providers)
+# Docker & Deploying the service with different backends (hosting providers)
 
+
+## Locally
+Just run the server by running your script.
+
+## Docker
+Prerequisite: You have created a python module "yourmodule.server" with the code that starts the server.
+Then to start the fast-task-api server in docker, add the following command at the end of your Dockerfile.
+
+```dockerfile 
+# Start the fast-task-api server which is instantiated in the module -m yourmodule.server
+CMD [ "python", "-m", "yourmodule.server"]
+```
+
+### Additional configuration: Backend, deployment type, host, port
 You can change the backend (hosting provider) either by setting it in the constructor or by setting the environment variable.
 ```dockerfile 
 # Options: "fastapi", "runpod"
 ENV FTAPI_BACKEND="runpod"
 # Options: "localhost", "serverless"
 ENV FTAPI_DEPLOYMENT="serverless"
-# Start the server
-CMD [ "python", "-u", "server.py"]
 ```
 
+Depending on the environment it is also necessary to specify the host and port.
+```dockerfile
+# allows any IP from the computer to connect to the host
+ENV FTAPI_HOST="0.0.0.0"
+# allows the docker container to use the port
+ARG port=8080
+ENV FTAPI_PORT=$port
+EXPOSE $port 
+```
 
 ## Runpod
 It is not required to write a [handler](https://docs.runpod.io/serverless/workers/handlers/overview) function anymore. The fast-task-api magic handles it :D
+Just change the ENV variable and described above.
 This brings you additional benefits:
 - Same syntax as with fastapi
 - Better file handling
-
-
-
-
-## Locally
-Just run the server. He is compatible with the socaity package.
-
+Ultra easy deploy.
 
 # Related projects and its differences
 
