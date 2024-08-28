@@ -214,8 +214,7 @@ class SocaityRunpodRouter(_SocaityRouter):
 
         runpod.serverless.start({"handler": self.handler})
 
-    def start(self, deployment: Union[FTAPI_DEPLOYMENTS, str] = FTAPI_DEPLOYMENT,
-              port: int = FTAPI_PORT, *args, **kwargs):
+    def start(self, deployment: Union[FTAPI_DEPLOYMENTS, str] = FTAPI_DEPLOYMENT, port: int = FTAPI_PORT, *args, **kwargs):
         if type(deployment) is str:
             deployment = FTAPI_DEPLOYMENTS(deployment)
         if deployment == deployment.LOCALHOST:
