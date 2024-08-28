@@ -23,7 +23,7 @@ class JobResult(BaseModel):
     status: Optional[str] = None
     progress: Optional[float] = 0.0
     message: Optional[str] = None
-    result: Union[FileResult, Any, None] = None
+    result: Union[FileResult, Any, str, None] = None
     refresh_job_url: Optional[str] = None
 
     created_at: Optional[str] = None

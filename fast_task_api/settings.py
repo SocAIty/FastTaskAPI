@@ -1,13 +1,16 @@
 import sys
 from os import environ
-from fast_task_api.CONSTS import EXECUTION_PROVIDERS, EXECUTION_ENVIRONMENTS
+from fast_task_api.CONSTS import FTAPI_BACKENDS, FTAPI_DEPLOYMENTS
 
 # Set the execution mode
-EXECUTION_ENVIRONMENT = environ.get("EXECUTION_ENVIRONMENT", EXECUTION_ENVIRONMENTS.LOCALHOST)
-EXECUTION_PROVIDER = environ.get("EXECUTION_PROVIDER", EXECUTION_PROVIDERS.FASTAPI)
+FTAPI_DEPLOYMENT = environ.get("FTAPI_DEPLOYMENT", FTAPI_DEPLOYMENTS.LOCALHOST)
+FTAPI_BACKEND = environ.get("FTAPI_BACKEND", FTAPI_BACKENDS.FASTAPI)
+# Configure the host and port
+FTAPI_HOST = environ.get("FTAPI_HOST", "0.0.0.0")
+FTAPI_PORT = environ.get("FTAPI_PORT", 8000)
 
 # to run the runpod serverless framework locally, the following two lines must be added
-if EXECUTION_PROVIDER == EXECUTION_PROVIDER.RUNPOD and EXECUTION_ENVIRONMENT == EXECUTION_ENVIRONMENTS.LOCALHOST:
+if FTAPI_BACKEND == FTAPI_BACKENDS.RUNPOD and FTAPI_DEPLOYMENT == FTAPI_DEPLOYMENTS.LOCALHOST:
     sys.argv.extend(['rp_serve_api', '1'])
     sys.argv.extend(['--rp_serve_api', '1'])
 

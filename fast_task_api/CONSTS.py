@@ -1,9 +1,9 @@
 from enum import Enum
-class EXECUTION_PROVIDERS(Enum):
+class FTAPI_BACKENDS(Enum):
     RUNPOD = "runpod"
     FASTAPI = "fastapi"
 
-class EXECUTION_ENVIRONMENTS(Enum):
+class FTAPI_DEPLOYMENTS(Enum):
     LOCALHOST = "localhost"
     HOSTED = "hosted"
     SERVERLESS = "serverless"

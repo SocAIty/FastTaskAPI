@@ -1,13 +1,19 @@
 import functools
+import importlib
 import inspect
+from datetime import datetime
 from typing import Union
 
-
 from fast_task_api.CONSTS import SERVER_STATUS
+from fast_task_api.compatibility.upload import is_param_media_toolkit_file
+from fast_task_api.core.job.InternalJob import JOB_STATUS
 from fast_task_api.core.job.JobProgress import JobProgressRunpod, JobProgress
+from fast_task_api.core.job.JobResult import JobResult
 from fast_task_api.core.routers._socaity_router import _SocaityRouter
 
-from fast_task_api.CONSTS import EXECUTION_ENVIRONMENTS
+from fast_task_api.CONSTS import FTAPI_DEPLOYMENTS
+from fast_task_api.settings import FTAPI_DEPLOYMENT, FTAPI_PORT
+from media_toolkit import media_from_any
 
 
 class SocaityRunpodRouter(_SocaityRouter):
@@ -19,8 +25,8 @@ class SocaityRunpodRouter(_SocaityRouter):
     All the runpod functionality is supported, jobs return an ID. Result can be fetched with the ID.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, title: str = "FastTaskAPI for ", summary: str = None, *args, **kwargs):
+        super().__init__(title=title, summary=summary, *args, **kwargs)
         self.routes = {}  # routes are organized like {"ROUTE_NAME": "ROUTE_FUNCTION"}
 
     def task_endpoint(
@@ -86,7 +92,21 @@ class SocaityRunpodRouter(_SocaityRouter):
         """
         Params of the function that are annotated with UploadDataType will be replaced with the file content.
         """
-        raise NotImplementedError("File uploads are not implemented for runpod yet.")
+        # original func parameter names: needed multiple times
+        original_func_parameters = inspect.signature(func).parameters
+        # create a dict to store the params that are UploadFiles
+        # this is used to later map the file while reading
+        upload_params = {
+            param.name: param.annotation
+            for param in original_func_parameters.values()
+            if is_param_media_toolkit_file(param)
+        }
+
+        # convert to media files
+        for key, value in upload_params.items():
+            if key in kwargs:
+                kwargs[key] = media_from_any(kwargs[key], media_file_type=original_func_parameters[key].annotation)
+
         return kwargs
 
     def _router(self, path, job, **kwargs):
@@ -100,7 +120,6 @@ class SocaityRunpodRouter(_SocaityRouter):
 
         if len(path) > 0 and path[0] == "/":
             path = path[1:]
-
         route_function = self.routes.get(path, None)
         if route_function is None:
             raise Exception(f"Route {path} not found")
@@ -118,10 +137,28 @@ class SocaityRunpodRouter(_SocaityRouter):
         kwargs = self._handle_file_uploads(route_function, **kwargs)
 
         # catch errors and display readable error messages
+        start_time = datetime.utcnow()
+        result = JobResult(id=job['id'], execution_started_at=start_time.strftime("%Y-%m-%dT%H:%M:%S.%f%z"))
+
         try:
-            return route_function(**kwargs)
+            # execute the function
+            res = route_function(**kwargs)
+            if is_param_media_toolkit_file(res):
+                res = res.to_json()
+            result.result = res
+            result.status = JOB_STATUS.FINISHED
         except Exception as e:
-            raise Exception(f"Error in path {path}: {e}")
+            result.status = JOB_STATUS.FAILED
+            result.message = str(e)
+        finally:
+            result.execution_finished_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+
+        #ret_job.refresh_job_url = f"/job?job_id={ret_job.id}"
+
+        #if return_format != 'json':
+        #    ret_job = JobResultFactory.gzip_job_result(ret_job)
+
+        return result
 
     def handler(self, job):
         """
@@ -140,20 +177,51 @@ class SocaityRunpodRouter(_SocaityRouter):
 
         return self._router(route, job, **inputs)
 
-    def start(self, environment: Union[EXECUTION_ENVIRONMENTS, str] = EXECUTION_ENVIRONMENTS.SERVERLESS, port=8000):
-        if type(environment) is str:
-            environment = EXECUTION_ENVIRONMENTS(environment)
+    def start_runpod_serverless_localhost(self, port):
+        # add the -rp_serve_api to the command line arguments to allow debugging
+        import sys
+        sys.argv.append("--rp_serve_api")
+        sys.argv.extend(["--rp_api_port", str(port)])
 
-        if environment == environment.LOCALHOST:
-            # add the -rp_serve_api to the command line arguments to allow debugging
-            import sys
-            sys.argv.append("--rp_serve_api")
+        # overwrite runpod variables. Little hacky but runpod does not expose the variables in a nice way.
+        import runpod.serverless
+        from runpod.serverless.modules import rp_fastapi
+        rp_fastapi.TITLE = self.title + " " + rp_fastapi.TITLE
+        rp_fastapi.DESCRIPTION = self.summary + " " + rp_fastapi.DESCRIPTION
+        desc = '''\
+                        In input declare your path as route for the function. Other parameters follow in the input as usual.
+                        The FastTaskAPI router will use the path argument to route to the correct function declared with 
+                        @task_endpoint(path="your_path").
+                        { "input": { "path": "your_path", "your_other_args": "your_other_args" } }
+                    '''
+        rp_fastapi.RUN_DESCRIPTION = desc + "\n" + rp_fastapi.RUN_DESCRIPTION
 
-            import runpod.serverless
-            runpod.serverless.start({"handler": self.handler})
+        class WorkerAPIWithModifiedInfo(rp_fastapi.WorkerAPI):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self._orig_openapi_func = self.rp_app.openapi
+                self.rp_app.openapi = self.custom_openapi
 
-        elif environment == environment.SERVERLESS:
+            def custom_openapi(self):
+                if not self.rp_app.openapi_schema:
+                    self._orig_openapi_func()
+                version = importlib.metadata.version("fast-task-api")
+                self.rp_app.openapi_schema["info"]["fast-task-api"] = version
+                self.rp_app.openapi_schema["info"]["runpod"] = rp_fastapi.runpod_version
+                return self.rp_app.openapi_schema
+
+        rp_fastapi.WorkerAPI = WorkerAPIWithModifiedInfo
+
+        runpod.serverless.start({"handler": self.handler})
+
+    def start(self, deployment: Union[FTAPI_DEPLOYMENTS, str] = FTAPI_DEPLOYMENT, port: int = FTAPI_PORT, *args, **kwargs):
+        if type(deployment) is str:
+            deployment = FTAPI_DEPLOYMENTS(deployment)
+        if deployment == deployment.LOCALHOST:
+            self.start_runpod_serverless_localhost(port=port)
+        elif deployment == deployment.SERVERLESS:
             import runpod.serverless
             runpod.serverless.start({"handler": self.handler})
         else:
-            raise Exception(f"Not implemented for environment {environment}")
+            raise Exception(f"Not implemented for environment {deployment}")
+

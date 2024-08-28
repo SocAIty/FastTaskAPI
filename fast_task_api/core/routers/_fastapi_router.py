@@ -1,37 +1,58 @@
 import functools
 import inspect
 from typing import Union
-
-from media_toolkit.utils.file_conversion import convert_to_upload_file_type
-
 from fastapi import APIRouter, FastAPI
+
 from fast_task_api.compatibility.upload import (convert_param_type_to_fast_api_upload_file,
                                                 is_param_media_toolkit_file)
-
-from fast_task_api.CONSTS import SERVER_STATUS
+from fast_task_api.settings import FTAPI_PORT, FTAPI_HOST
+from media_toolkit import media_from_any
+from fast_task_api.CONSTS import SERVER_STATUS, FTAPI_DEPLOYMENTS
 from fast_task_api.core.JobManager import JobQueue
 from fast_task_api.core.job.JobResult import JobResult, JobResultFactory
 from fast_task_api.core.routers._socaity_router import _SocaityRouter
 from fast_task_api.core.routers.router_mixins._queue_mixin import _QueueMixin
 
+import importlib.metadata
+
 
 class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
-    def __init__(self, app: Union[FastAPI, None] = None, prefix: str = "/api", *args, **kwargs):
+    def __init__(
+            self,
+            title: str = "FastTaskAPI",
+            summary: str = "Create web-APIs for long-running tasks",
+            app: Union[FastAPI, None] = None,
+            prefix: str = "/api",
+            *args, **kwargs):
         """
+        :param title: The title of the app. (Like FastAPI(title))
+        :param summary: The summary of the app. (Like FastAPI(summary))
         :param app: You can pass an existing fastapi app, if you like to have multiple routers in one app
         :param prefix: The prefix of this app for the paths
         :param args: other fastapi app arguments
         :param kwargs: other fastapi app keyword arguments
         """
-        super().__init__(*args, **kwargs)
+        # INIT upper classes
+        # inspect the APIRouter params and init with only the ones that are needed
+        pams = inspect.signature(APIRouter.__init__).parameters
+        api_router_init_kwargs = {
+            key: kwargs[key]
+            for key in pams.keys()
+            if key in kwargs
+        }
+        # need to do each init separately instead of super().__init__(*args, **kwargs) to avoid conflicts with APIRouter
+        APIRouter.__init__(self, **api_router_init_kwargs)
+        _SocaityRouter.__init__(self=self, title=title, summary=summary, *args, **kwargs)
+        _QueueMixin.__init__(self, *args, **kwargs)
+
         self.job_queue = JobQueue()
         self.status = SERVER_STATUS.INITIALIZING
 
+        # Configuring the fastapi app and router
         if app is None:
             app = FastAPI(
-                title="FastTaskAPI",
-                summary="Create web-APIs for long-running tasks",
-                version="0.0.0",
+                title=self.title,
+                summary=self.summary,
                 contact={
                     "name": "SocAIty",
                     "url": "https://github.com/SocAIty",
@@ -40,12 +61,21 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
         self.app = app
         self.prefix = prefix
         self.add_standard_routes()
+        self._orig_openapi_func = self.app.openapi
+        self.app.openapi = self.custom_openapi
 
     def add_standard_routes(self):
         self.api_route(path="/job", methods=["GET", "POST"])(self.get_job)
         self.api_route(path="/status", methods=["GET", "POST"])(self.get_status)
         # ToDo: add favicon
         #self.api_route('/favicon.ico', include_in_schema=False)(self.favicon)
+
+    def custom_openapi(self):
+        if not self.app.openapi_schema:
+            self._orig_openapi_func()
+        version = importlib.metadata.version("fast-task-api")
+        self.app.openapi_schema["info"]["fast-task-api"] = version
+        return self.app.openapi_schema
 
     def get_job(self, job_id: str, return_format: str = 'json', keep_in_memory: bool = False) -> JobResult:
         """
@@ -98,9 +128,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
             # check if we have the file in our list
             my_data_type = upload_params.get(param_name, None)
             if my_data_type is not None:
-                return convert_to_upload_file_type(data, my_data_type)
-
-                # return starlette_uploadfile_to_socaity_upload_file(data, my_data_type)
+                return media_from_any(data, my_data_type)
             # if is not a file, return as is
             return data
 
@@ -125,21 +153,6 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
         func.__signature__ = new_sig
 
         return file_upload_wrapper
-
-        ## modify execution to handle file uploads in the same way as in runpod
-        #def func_with_file_upload(*args, **kwargs):
-        #    for param in inspect.signature(func).parameters.values():
-        #        if param.annotation == compatibility.UploadDataType:
-        #            file = kwargs[param.name]
-        #            if isinstance(file, str):
-        #                try:
-        #                    decoded_file = compatibility.base64_to_file(file, param.annotation)
-        #                    kwargs[param.name] = decoded_file
-        #                except Exception as e:
-        #                    logging.error(f"Error decoding file {param.name} in upload. We pass it as is. Error: {e}")
-        #    return func(*args, **kwargs)
-#
-        #return func_with_file_upload
 
     @functools.wraps(APIRouter.api_route)
     def endpoint(self, path: str, methods: list[str] = None, *args, **kwargs):
@@ -197,7 +210,7 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
     def post(self, path: str = None, queue_size: int = 100, *args, **kwargs):
         return self.task_endpoint(path=path, queue_size=queue_size, methods=["POST"], *args, **kwargs)
 
-    def start(self, environment="localhost", port=8000):
+    def start(self, port: int = FTAPI_PORT, host: str = FTAPI_HOST, *args, **kwargs):
         """
         Start the FastAPI server and add this app.
         """
@@ -206,7 +219,11 @@ class SocaityFastAPIRouter(APIRouter, _SocaityRouter, _QueueMixin):
             self.app = FastAPI()
 
         self.app.include_router(self)
-        print(f"FastTaskAPI {self.app.title} started. Use http://localhost:{port}/docs to see the API documentation.")
+
+        # print helping statement
+        print_host = "localhost" if host == "0.0.0.0" or host is None else host
+        print(f"FastTaskAPI {self.app.title} started. Use http://{print_host}:{port}/docs to see the API documentation.")
+        # start uvicorn
         import uvicorn
-        uvicorn.run(self.app, host=environment, port=port)
+        uvicorn.run(self.app, host=host, port=port)
 
