@@ -7,7 +7,7 @@ from fast_task_api.compatibility.upload import (convert_param_type_to_fast_api_u
                                                 is_param_media_toolkit_file)
 from fast_task_api.settings import FTAPI_PORT, FTAPI_HOST
 from media_toolkit import media_from_any
-from fast_task_api.CONSTS import SERVER_STATUS, FTAPI_DEPLOYMENTS
+from fast_task_api.CONSTS import SERVER_STATUS
 from fast_task_api.core.JobManager import JobQueue
 from fast_task_api.core.job.JobResult import JobResult, JobResultFactory
 from fast_task_api.core.routers._socaity_router import _SocaityRouter
