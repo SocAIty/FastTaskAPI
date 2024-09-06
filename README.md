@@ -252,8 +252,9 @@ EXPOSE $port
 It is not required to write a [handler](https://docs.runpod.io/serverless/workers/handlers/overview) function anymore. The fast-task-api magic handles it :D
 Just change the ENV variable and described above.
 This brings you additional benefits:
-- Same syntax as with fastapi
-- Better file handling
+- [x] Same syntax as with fastapi
+- [x] Router functionalities.
+- [x] Better file handling
 ultra easy deploy.
 
 # Related projects and its differences
