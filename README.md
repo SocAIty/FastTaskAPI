@@ -255,7 +255,10 @@ This brings you additional benefits:
 - [x] Same syntax as with fastapi
 - [x] Router functionalities.
 - [x] Better file handling
-ultra easy deploy.
+- [x] ultra easy deploy. 
+
+When deployed with runpod, fast-task-api will use the builtin runpod job handling instead 
+of using the own job queue implementation.
 
 # FastSDK :two_hearts: FastTaskAPI
 
