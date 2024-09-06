@@ -257,16 +257,23 @@ This brings you additional benefits:
 - [x] Better file handling
 ultra easy deploy.
 
+# FastSDK :two_hearts: FastTaskAPI
+
+<img src="docs/fastsdk_to_fasttaskapi.png" width="50%" />
+
+[FastSDK](https://github.com/SocAIty/fastSDK) allows you to easily invoke your FastTaskAPI services with python in an efficient parallel manner.
+Therefore you can natively work with them as if they are python functions.
+Read the [fastSDK](https://github.com/SocAIty/fastSDK). documentation to get started.
+
 # Related projects and its differences
 
 ## Starlette Background Tasks
 
 The fastapi documentation recommends using starlette background tasks for long-running tasks like sending an e-mail.
-- No common interface / response type. 
-  - This leads to re-implementing the same functionality over and over again.
-  - Creates more overhead in the client and server code.
-- No job progress and monitoring functionality
-  - With background tasks clients have no chance to monitor the progress of the job or to know when the job is finished.
+However starlette background tasks have several drawbacks.
+- Without a job queue, the server can be overloaded with tasks pretty fast.
+- It's not clear when and how to return the result to the client. So you need to write your own "webhook" code.
+- No job progress and monitoring functionality for the client. 
 - No job queue:
   - If you don't have a job queue, the server can be overloaded with tasks pretty fast.
   - With socaity you can specify the maximum queue size for a task. If this is exceeded the task is not executed.
