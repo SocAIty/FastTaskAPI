@@ -213,21 +213,12 @@ my_files = {
 response = httpx.Client().post(url, files=my_files)
 ```
 
-### Using a cloud storage provider for file up and download
 
-You can specify a cloud_storage provider.
-Then instead of sending the file directly back to the client, the file is uploaded to your storage provider and a download link is returned.
-```python
-
-```
-
-
-
-# Docker & Deploying the service with different backends (hosting providers)
+# Deployment of the service with different backends (hosting providers)
 
 
 ## Locally
-Just run the server by running your script.
+Just run the server by running your script ```app.start()``` this will spin-up uvicorn on localhost:port.
 
 ## Docker
 Prerequisite: You have created a python module "yourmodule.server" with the code that starts the server.
@@ -263,7 +254,7 @@ Just change the ENV variable and described above.
 This brings you additional benefits:
 - Same syntax as with fastapi
 - Better file handling
-Ultra easy deploy.
+ultra easy deploy.
 
 # Related projects and its differences
 
@@ -291,7 +282,7 @@ However it comes with several drawbacks:
 - Overkill for most projects.
 
 Socaity router is lightweight and provides background task functionality abstracted from the developer.
-This doesn't mean that we don't recommend celery. Indeed it is planned to integrate celery as possible backend.
+This doesn't mean that we don't recommend celery. Indeed, it is planned to integrate celery as possible backend.
 
 
 # Roadmap

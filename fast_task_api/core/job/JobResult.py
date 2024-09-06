@@ -49,9 +49,14 @@ class JobResultFactory:
         if is_param_media_toolkit_file(ij.result):
             result = FileResult(**result.to_json())
 
+        # Job_status is an Enum, convert it to a string to return it as json
+        status = ij.status
+        if isinstance(status, JOB_STATUS):
+            status = status.value
+
         return JobResult(
             id=ij.id,
-            status=ij.status,
+            status=status,
             progress=ij.job_progress._progress,
             message=ij.job_progress._message,
             result=result,
