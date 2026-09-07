@@ -1,10 +1,8 @@
-"""Shared base for models loaded through the Hugging Face transformers library.
+"""Shared base for the Hugging Face transformers adapter.
 
-``Transformers`` owns everything the concrete presets (``TransformersLLM``,
-``TransformersVLM``) have in common: HF include normalization, the
-``from_pretrained`` kwargs (dtype, device map, fastest attention backend) and
-the threaded token-streaming loop. Subclasses implement ``load()`` plus their
-inference surface.
+``Transformers`` owns include normalization, ``from_pretrained`` kwargs,
+chat generation, text embeddings, and the token-streaming loop.
+:class:`~apipod.models.transformers.vlm.VLM` is the concrete preset.
 """
 from __future__ import annotations
 
@@ -25,7 +23,7 @@ class Transformers(Model):
     (the torch module) in ``load()``.
     """
 
-    def __init__(self, weights: Union[IncludeHandle, str]):
+    def __init__(self, weights: Union[IncludeHandle, str], *, enable_thinking: Optional[bool] = None):
         if isinstance(weights, str):
             weights = include_hf(weights)
         if weights.kind != "hf":
@@ -34,6 +32,7 @@ class Transformers(Model):
                 "Pass an HF model id string or an include_hf() handle."
             )
         self.weights = weights
+        self.enable_thinking = enable_thinking
 
     # ------------------------------------------------------------------
     # Load helpers
@@ -59,13 +58,84 @@ class Transformers(Model):
         return "sdpa"
 
     def _from_pretrained_kwargs(self) -> dict:
-        """Standard ``from_pretrained`` kwargs shared by all presets."""
-        return {
+        """Standard ``from_pretrained`` kwargs shared by all presets.
+
+        On CUDA, ``max_memory`` keeps weights on GPU and refuses host offload.
+        ``device_map='auto'`` is required for FP8 checkpoints that crash with
+        a pinned ``{"": 0}`` map.
+        """
+        kwargs = {
             "trust_remote_code": True,
             "dtype": "auto",
             "device_map": "auto",
             "attn_implementation": self.attn_implementation(),
         }
+        try:
+            import torch
+        except ImportError:
+            return kwargs
+        if not torch.cuda.is_available():
+            return kwargs
+        vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+        gpu_budget = max(int(vram_gb) - 4, 8)
+        kwargs["max_memory"] = {0: f"{gpu_budget}GiB", "cpu": "0GiB"}
+        print(
+            f"[apipod] GPU load: {vram_gb:.1f} GiB visible, "
+            f"max_memory={{0: '{gpu_budget}GiB', 'cpu': '0GiB'}}",
+            flush=True,
+        )
+        return kwargs
+
+    def _inputs_to_device(self, inputs):
+        """Move tokenized inputs onto the first real (non-meta) parameter device."""
+        device = getattr(self.net, "device", None)
+        if device is None or getattr(device, "type", None) == "meta":
+            device = next(p.device for p in self.net.parameters() if p.device.type != "meta")
+        return inputs.to(device)
+
+    def _apply_chat_template(self, renderer, conversation, **common):
+        """Apply a chat template. ``enable_thinking`` is forwarded only when set."""
+        if self.enable_thinking is None:
+            return renderer.apply_chat_template(conversation, **common)
+        try:
+            return renderer.apply_chat_template(
+                conversation, enable_thinking=self.enable_thinking, **common,
+            )
+        except TypeError:
+            return renderer.apply_chat_template(conversation, **common)
+
+    def _renderer(self):
+        """Processor when present, otherwise the tokenizer."""
+        return getattr(self, "processor", None) or self.tokenizer
+
+    def _tokenizer(self):
+        renderer = self._renderer()
+        return getattr(renderer, "tokenizer", renderer)
+
+    def _decode(self, new_tokens) -> str:
+        renderer = self._renderer()
+        decode = getattr(renderer, "decode", None) or self._tokenizer().decode
+        return decode(new_tokens, skip_special_tokens=True).strip()
+
+    def _context_length(self) -> Optional[int]:
+        """Native context from tokenizer or nested HF config. None when unknown."""
+        tokenizer = getattr(self, "tokenizer", None)
+        if tokenizer is None:
+            processor = getattr(self, "processor", None)
+            tokenizer = getattr(processor, "tokenizer", None)
+        model_max = getattr(tokenizer, "model_max_length", None)
+        if isinstance(model_max, (int, float)) and 16 < int(model_max) < 10_000_000:
+            return int(model_max)
+        config = getattr(getattr(self, "net", None), "config", None)
+        if config is None:
+            return None
+        for mapping in (config, getattr(config, "text_config", None), getattr(config, "llm_config", None)):
+            if mapping is None:
+                continue
+            value = getattr(mapping, "max_position_embeddings", None)
+            if isinstance(value, int) and value > 0:
+                return value
+        return None
 
     # ------------------------------------------------------------------
     # Inference helpers
@@ -100,16 +170,17 @@ class Transformers(Model):
     @staticmethod
     def _generation_kwargs(
         temperature: float,
-        max_tokens: int,
+        max_tokens: Optional[int],
         top_p: float = 1.0,
         stop=None,
         tokenizer=None,
     ) -> dict:
         kwargs = {
-            "max_new_tokens": max_tokens,
             "do_sample": temperature > 0,
             "temperature": max(temperature, 1e-5),
         }
+        if max_tokens is not None:
+            kwargs["max_new_tokens"] = max_tokens
         if top_p is not None and top_p < 1.0:
             kwargs["top_p"] = top_p
         if stop:
@@ -125,13 +196,16 @@ class Transformers(Model):
 
             torch.manual_seed(seed)
 
-    def _template_supports_tools(self, tokenizer) -> bool:
+    def _template_supports_tools(self, renderer) -> bool:
         """A chat template that renders tools references the ``tools`` variable."""
-        template = getattr(tokenizer, "chat_template", None) or ""
+        template = getattr(renderer, "chat_template", None) or ""
+        if not template:
+            tokenizer = getattr(renderer, "tokenizer", None)
+            template = getattr(tokenizer, "chat_template", None) or ""
         return "tools" in template
 
-    def _require_tool_support(self, tokenizer) -> None:
-        if not self._template_supports_tools(tokenizer):
+    def _require_tool_support(self, renderer) -> None:
+        if not self._template_supports_tools(renderer):
             raise ValueError(
                 f"{self.weights.ref} does not support tool calls: its chat template "
                 "has no 'tools' support. Retry without tools or use a tool-tuned model."
@@ -201,7 +275,7 @@ class Transformers(Model):
         text: str,
         prompt_tokens: int,
         completion_tokens: int,
-        max_tokens: int,
+        max_tokens: Optional[int],
         logprobs: Optional[dict] = None,
     ):
         """Parse raw output; return plain text or a ChatCompletionResponse-shaped dict.
@@ -221,7 +295,7 @@ class Transformers(Model):
 
         if message.get("tool_calls"):
             finish_reason = "tool_calls"
-        elif completion_tokens >= max_tokens:
+        elif max_tokens is not None and completion_tokens >= max_tokens:
             finish_reason = "length"
         else:
             finish_reason = "stop"
@@ -253,3 +327,111 @@ class Transformers(Model):
         for token in self._stream_tokens(tokenizer, generate_kwargs):
             yield from parser.feed(token)
         yield from parser.flush()
+
+    def _text_messages(self, messages) -> list[dict]:
+        """Flatten multimodal content parts to plain text (text-only path)."""
+        normalized = self._normalize_messages(messages)
+        for message in normalized:
+            content = message.get("content")
+            if isinstance(content, list):
+                message["content"] = "".join(
+                    part.get("text", "") for part in content if isinstance(part, dict) and part.get("type") == "text"
+                )
+        return normalized
+
+    def _chat_inputs(self, messages, images=None, tools=None):
+        """Tokenize a text conversation. Vision models override this."""
+        if images:
+            raise ValueError(
+                f"{self.weights.ref} does not accept images. Use a vision-language checkpoint."
+            )
+        inputs = self._apply_chat_template(
+            self._renderer(),
+            self._text_messages(messages),
+            tools=tools,
+            add_generation_prompt=True,
+            return_dict=True,
+            return_tensors="pt",
+        )
+        inputs.pop("token_type_ids", None)
+        return self._inputs_to_device(inputs)
+
+    def _generation_run_kwargs(self, temperature, max_tokens, top_p, stop) -> dict:
+        tokenizer = self._tokenizer()
+        kwargs = self._generation_kwargs(temperature, max_tokens, top_p, stop, tokenizer)
+        if getattr(tokenizer, "eos_token_id", None) is not None:
+            kwargs.setdefault("pad_token_id", tokenizer.eos_token_id)
+        return kwargs
+
+    def generate(
+        self,
+        messages,
+        images=None,
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None,
+        top_p: float = 1.0,
+        stop=None,
+        seed=None,
+        tools=None,
+        tool_choice=None,
+        logprobs: bool = False,
+        top_logprobs=None,
+    ):
+        """Chat completion. ``images`` is accepted on vision checkpoints."""
+        tools = self._prepare_tools(tools, tool_choice)
+        if tools:
+            self._require_tool_support(self._renderer())
+        self._apply_seed(seed)
+        inputs = self._chat_inputs(messages, images, tools)
+        generation_kwargs = self._generation_run_kwargs(temperature, max_tokens, top_p, stop)
+        new_tokens, scores = self._run_generate(inputs, generation_kwargs, with_scores=logprobs)
+        payload = self._token_logprobs(self._tokenizer(), new_tokens, scores, top_logprobs) if logprobs else None
+        return self._chat_result(
+            self._decode(new_tokens),
+            prompt_tokens=inputs["input_ids"].shape[-1],
+            completion_tokens=len(new_tokens),
+            max_tokens=max_tokens,
+            logprobs=payload,
+        )
+
+    def stream(
+        self,
+        messages,
+        images=None,
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None,
+        top_p: float = 1.0,
+        stop=None,
+        seed=None,
+        tools=None,
+        tool_choice=None,
+    ) -> Iterator:
+        """Stream typed chat deltas: content as str, reasoning / tool calls as ChatDelta dicts."""
+        tools = self._prepare_tools(tools, tool_choice)
+        if tools:
+            self._require_tool_support(self._renderer())
+        self._apply_seed(seed)
+        inputs = self._chat_inputs(messages, images, tools)
+        yield from self._stream_deltas(
+            self._tokenizer(),
+            dict(**inputs, **self._generation_run_kwargs(temperature, max_tokens, top_p, stop)),
+        )
+
+    def embed_text(self, text: str | list[str]) -> list[float] | list[list[float]]:
+        """Mean-pooled last-layer hidden states (works for most causal LMs)."""
+        single = isinstance(text, str)
+        texts = [text] if single else text
+        max_length = self._context_length()
+        tokenize_kwargs = dict(padding=True, truncation=max_length is not None, return_tensors="pt")
+        if max_length is not None:
+            tokenize_kwargs["max_length"] = max_length
+        inputs = self._tokenizer()(texts, **tokenize_kwargs)
+        inputs = self._inputs_to_device(inputs)
+        import torch
+
+        with torch.no_grad():
+            hidden = self.net(**inputs, output_hidden_states=True).hidden_states[-1]
+        mask = inputs["attention_mask"].unsqueeze(-1)
+        pooled = (hidden * mask).sum(dim=1) / mask.sum(dim=1).clamp(min=1e-9)
+        vectors = pooled.float().cpu().tolist()
+        return vectors[0] if single else vectors

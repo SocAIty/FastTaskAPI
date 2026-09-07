@@ -100,10 +100,12 @@ def register_model_endpoints(app: APIPod, model: Model) -> List[str]:
         app.endpoint(path="/chat")(_vlm_chat(model) if supports_images else _llm_chat(model))
         registered.append("/chat")
 
-    if _class_method(model, "embed") is not None:
+    # Chat is a facade: embeddings live on the engine, not the public class.
+    embed_owner = getattr(model, "_engine", None) or model
+    if _class_method(embed_owner, "embed") is not None:
         app.endpoint(path="/embeddings")(_multimodal_embeddings(model))
         registered.append("/embeddings")
-    elif _class_method(model, "embed_text") is not None:
+    elif _class_method(embed_owner, "embed_text") is not None:
         app.endpoint(path="/embeddings")(_text_embeddings(model))
         registered.append("/embeddings")
 
@@ -130,7 +132,7 @@ def _chat_kwargs(request: ChatCompletionRequest, method) -> dict:
     kwargs = {
         "messages": request.messages,
         "temperature": request.temperature,
-        "max_tokens": request.max_completion_tokens or request.max_tokens or 512,
+        "max_tokens": request.max_completion_tokens or request.max_tokens,
         "top_p": request.top_p,
         "stop": request.stop,
         "seed": request.seed,
@@ -150,7 +152,11 @@ def _chat_kwargs(request: ChatCompletionRequest, method) -> dict:
             f"{' and '.join(unsupported)} not supported here: {method.__qualname__} does not "
             "accept these parameters. Logprobs are only available on non-streaming requests."
         )
-    return {name: value for name, value in kwargs.items() if name in supported}
+    return {
+        name: value
+        for name, value in kwargs.items()
+        if name in supported and not (name == "max_tokens" and value is None)
+    }
 
 
 def _dispatch_chat(model: Model, request, extra: Optional[dict] = None):

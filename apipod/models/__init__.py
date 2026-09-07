@@ -9,7 +9,7 @@ app start (lazy thread-safe fallback on first use).
 from apipod.models.chat import Chat
 from apipod.models.includes import IncludeHandle, include, include_hf, declared_includes
 from apipod.models.model import Model, declared_models, load_declared_models
-from apipod.models.transformers import Transformers, TransformersLLM, TransformersVLM
+from apipod.models.transformers import Transformers, VLM
 from apipod.models.vllm import VLLMChat
 
 __all__ = [
@@ -19,8 +19,7 @@ __all__ = [
     "include_hf",
     "Model",
     "Transformers",
-    "TransformersLLM",
-    "TransformersVLM",
+    "VLM",
     "VLLMChat",
     "declared_includes",
     "declared_models",

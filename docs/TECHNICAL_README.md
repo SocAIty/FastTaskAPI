@@ -40,7 +40,7 @@ apipod/
 │   ├── includes.py         # include / include_hf handles (declare bytes, resolve lazily)
 │   ├── model.py            # Model base: load()/warmup(), registry, app-start loading
 │   ├── chat.py             # Chat(): capability preset; picks vLLM or transformers
-│   ├── transformers/       # Transformers base + TransformersLLM / TransformersVLM presets
+│   ├── transformers/       # Transformers base + VLM preset (text or vision)
 │   └── vllm/               # VLLMChat engine: spawn `vllm serve`, OpenAI HTTP generate/agenerate
 └── deploy/                 # `apipod build`: Dockerfile generation, dependency/CUDA detection
 ```
@@ -48,7 +48,7 @@ apipod/
 ### Chat (`apipod/models/chat.py`)
 
 ``Chat`` is the public chat preset. Users construct ``Chat("org/model")``; they
-do not choose ``VLLMChat`` vs ``TransformersVLM``. Engine pick is ``engine=``
+do not choose ``VLLMChat`` vs ``VLM``. Engine pick is ``engine=``
 kwarg, then ``APIPOD_ENGINE``, then ``vllm`` if the CLI is on PATH, else
 ``transformers``. ``generate`` always accepts ``images`` so ``serve()``
 registers vision ``/chat``. The vLLM backend is still a subprocess (never an
@@ -63,22 +63,23 @@ the Model registry; only the ``Chat`` facade is declared.
 normalization, ``from_pretrained`` kwargs (``dtype="auto"``, ``device_map="auto"``
 and the fastest available attention backend: ``flash_attention_2`` when the
 compiled ``flash_attn`` package plus CUDA are present, ``sdpa`` otherwise) and
-the threaded ``TextIteratorStreamer`` loop. ``TransformersLLM`` (causal chat +
-``embed_text``) and ``TransformersVLM`` (image+text chat + multimodal ``embed``)
-are the concrete presets. ``TransformersVLM`` resolves the model class through
-the auto-class ladder ``AutoModelForImageTextToText`` →
-``AutoModelForMultimodalLM``, which covers Qwen-VL generations as well as
-encoder-free unified models like Gemma 4.
+the threaded ``TextIteratorStreamer`` loop, text ``generate``/``stream``, and
+``embed_text``. ``VLM`` is the only concrete preset. It tries
+``AutoModelForImageTextToText`` then ``AutoModelForMultimodalLM``, then
+``AutoModelForCausalLM`` for text checkpoints. ``enable_thinking`` is forwarded
+only when the caller sets it.
 
 ### vLLM engine (`apipod/models/vllm`)
 
 ``VLLMChat`` is the vLLM engine behind ``Chat``, not a second public preset.
-It does not import vLLM. ``load()`` reads the checkpoint ``config.json``
-(``max_position_embeddings`` and rope scaling) and passes ``--max-model-len``.
-``APIPOD_VLLM_MAX_MODEL_LEN`` is a fallback when that file is missing. Other
-``APIPOD_VLLM_*`` options come from ``apipod.models.vllm.config``. ``load()``
+It does not import vLLM. ``load()`` starts ``vllm serve`` and only passes
+``APIPOD_VLLM_*`` flags that are explicitly set (max model len, max num seqs,
+parsers, speculative config, extra args). Detected ``config.json`` context
+(``max_position_embeddings``, nested ``text_config``, rope scaling) is logged
+for diagnostics and is not turned into ``--max-model-len``. ``load()``
 polls ``/health``, and ``generate``/``agenerate`` POST to
-``/v1/chat/completions``. Those env vars are engine argv, not APIPod process
+``/v1/chat/completions``. Request ``max_tokens`` is omitted when the client
+omits it. Those env vars are engine argv, not APIPod process
 settings; they do not live in ``common/settings.py``. Native OpenAI ``message.tool_calls`` are used as-is
 when the server emits them (enable auto tool-choice plus a tool-call parser).
 ``tools``, ``tool_choice``, and ``parallel_tool_calls`` are forwarded on ``/chat``.

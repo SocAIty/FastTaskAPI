@@ -570,8 +570,8 @@ APIPod exposes effective served limits. SPAINE or another agent runtime owns sum
 #### Verification
 
 - Start Qwen3.8 with no APIPod context (locally no vLLM).
-- Deploy the Qwen service privately through the current custom deployment path.
-- Call it through socaity sdk with more than 8,192 input tokens and no framework-supplied completion limit.
+- Deploy the Qwen service privately through the current custom deployment path. Use the already deployed test-backend not prod for deployment.
+- Call it through socaity sdk with more than 8,192 input tokens and no framework-supplied completion limit. Reuse/refactor existing test in socaity sdk for it.
 - Verify explicit `max_tokens` still works.
 - Verify the native context limit and a deliberate overflow produce accurate errors.
 

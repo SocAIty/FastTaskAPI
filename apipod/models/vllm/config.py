@@ -12,17 +12,16 @@ def _get(name: str, default: str = "") -> str:
 
 HOST = _get("HOST", "127.0.0.1")
 PORT = int(_get("PORT", "18000"))
-# Fallback only when config.json cannot be read. Chat.load() prefers the
-# checkpoint's max_position_embeddings (and rope scaling).
+# Passed to vLLM only when the env var is set. Detected config.json context
+# is diagnostic metadata, not an implicit --max-model-len.
 MAX_MODEL_LEN = _get("MAX_MODEL_LEN", "")
-# worker-vllm default. vLLM's own default (1024) exceeds Qwen3.8 Mamba cache.
-MAX_NUM_SEQS = _get("MAX_NUM_SEQS", "256")
+MAX_NUM_SEQS = _get("MAX_NUM_SEQS", "")
 REASONING_PARSER = _get("REASONING_PARSER", "")
 TOOL_CALL_PARSER = _get("TOOL_CALL_PARSER", "")
 SPECULATIVE_CONFIG = _get("SPECULATIVE_CONFIG", "")
 # Leftover CLI flags that are not first-class (kv cache dtype, batch tokens).
 EXTRA_ARGS = _get("EXTRA_ARGS", "")
 STARTUP_TIMEOUT = int(_get("STARTUP_TIMEOUT", "1200"))
-ENABLE_AUTO_TOOL_CHOICE = _get("ENABLE_AUTO_TOOL_CHOICE", "1").strip().lower() not in (
-    "0", "false", "no",
+ENABLE_AUTO_TOOL_CHOICE = _get("ENABLE_AUTO_TOOL_CHOICE", "").strip().lower() in (
+    "1", "true", "yes",
 )

@@ -1,8 +1,7 @@
-"""Vision-language preset: image+text chat and multimodal embeddings."""
+"""Vision-language preset. Loads a VLM or falls back to a causal LM."""
 from __future__ import annotations
 
-import io
-from typing import Iterator, List, Optional
+from typing import List, Optional
 
 from socaity_cli import requires
 
@@ -26,111 +25,56 @@ def to_pil_image(image):
     return Image.open(image).convert("RGB")
 
 
-class TransformersVLM(Transformers):
-    """Built-in vision-language preset (Qwen-VL, Gemma, ... via transformers auto classes).
+class VLM(Transformers):
+    """Transformers chat preset for text and vision-language checkpoints.
 
-    ``generate``/``stream`` run image+text chat through the model's chat
-    template; ``embed`` pools the last hidden state into one vector per
-    (text, image) input (last-token pooling + L2 norm, the common VLM
-    embedding recipe).
+    ``load()`` tries VLM auto classes, then ``AutoModelForCausalLM``.
+    ``generate``/``stream`` accept optional images. ``embed`` is multimodal
+    when a processor is present; ``embed_text`` is always available.
     """
 
     default_embed_instruction = "Represent the user's input."
 
     @requires("transformers", cli=False)
     def load(self) -> None:
-        from transformers import AutoProcessor
+        import transformers
+        from transformers import AutoModelForCausalLM, AutoProcessor, AutoTokenizer
 
         path = str(self.weights.path)
-        self.processor = AutoProcessor.from_pretrained(path, trust_remote_code=True)
-        self.net = self._load_net(path)
-
-    def _load_net(self, path: str):
-        import transformers
-
         last_error: Optional[Exception] = None
         for class_name in _VLM_AUTO_CLASSES:
             auto_cls = getattr(transformers, class_name, None)
             if auto_cls is None:
                 continue
             try:
-                return auto_cls.from_pretrained(path, **self._from_pretrained_kwargs())
-            except ValueError as error:  # config not in this auto class mapping
+                self.processor = AutoProcessor.from_pretrained(path, trust_remote_code=True)
+                self.net = auto_cls.from_pretrained(path, **self._from_pretrained_kwargs())
+                return
+            except ValueError as error:
                 last_error = error
-        raise ValueError(
-            f"No transformers VLM auto class can load {self.weights.ref!r}. "
-            f"Tried {', '.join(_VLM_AUTO_CLASSES)}. Last error: {last_error}"
-        )
+                self.processor = None
+
+        self.processor = None
+        self.tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        try:
+            self.net = AutoModelForCausalLM.from_pretrained(path, **self._from_pretrained_kwargs())
+        except Exception as error:
+            raise ValueError(
+                f"No transformers auto class can load {self.weights.ref!r}. "
+                f"Tried {', '.join(_VLM_AUTO_CLASSES)} and AutoModelForCausalLM. "
+                f"Last error: {last_error or error}"
+            ) from error
 
     def warmup(self) -> None:
         self.generate([{"role": "user", "content": "ping"}], max_tokens=1)
 
-    # ------------------------------------------------------------------
-    # Chat
-    # ------------------------------------------------------------------
-
-    def generate(
-        self,
-        messages,
-        images=None,
-        temperature: float = 0.7,
-        max_tokens: int = 512,
-        top_p: float = 1.0,
-        stop=None,
-        seed=None,
-        tools=None,
-        tool_choice=None,
-        logprobs: bool = False,
-        top_logprobs=None,
-    ):
-        """Image+text chat completion.
-
-        Returns plain text for simple completions; a ChatCompletionResponse-shaped
-        dict when the model emits reasoning or tool calls, or logprobs are requested.
-        """
-        tools = self._prepare_tools(tools, tool_choice)
-        if tools:
-            self._require_tool_support(self.processor)
-        self._apply_seed(seed)
-        inputs = self._chat_inputs(messages, images, tools)
-        generation_kwargs = self._generation_kwargs(temperature, max_tokens, top_p, stop, self.processor.tokenizer)
-        new_tokens, scores = self._run_generate(inputs, generation_kwargs, with_scores=logprobs)
-
-        text = self.processor.decode(new_tokens, skip_special_tokens=True).strip()
-        payload = self._token_logprobs(self.processor.tokenizer, new_tokens, scores, top_logprobs) if logprobs else None
-        return self._chat_result(
-            text,
-            prompt_tokens=inputs["input_ids"].shape[-1],
-            completion_tokens=len(new_tokens),
-            max_tokens=max_tokens,
-            logprobs=payload,
-        )
-
-    def stream(
-        self,
-        messages,
-        images=None,
-        temperature: float = 0.7,
-        max_tokens: int = 512,
-        top_p: float = 1.0,
-        stop=None,
-        seed=None,
-        tools=None,
-        tool_choice=None,
-    ) -> Iterator:
-        """Stream typed chat deltas: content as str, reasoning / tool calls as ChatDelta dicts."""
-        tools = self._prepare_tools(tools, tool_choice)
-        if tools:
-            self._require_tool_support(self.processor)
-        self._apply_seed(seed)
-        inputs = self._chat_inputs(messages, images, tools)
-        yield from self._stream_deltas(
-            self.processor.tokenizer,
-            dict(**inputs, **self._generation_kwargs(temperature, max_tokens, top_p, stop, self.processor.tokenizer)),
-        )
-
-    def _chat_inputs(self, messages, images, tools=None):
-        inputs = self.processor.apply_chat_template(
+    def _chat_inputs(self, messages, images=None, tools=None):
+        if getattr(self, "processor", None) is None:
+            return super()._chat_inputs(messages, images, tools)
+        inputs = self._apply_chat_template(
+            self.processor,
             self._conversation(messages, images),
             tools=tools,
             tokenize=True,
@@ -139,7 +83,7 @@ class TransformersVLM(Transformers):
             return_tensors="pt",
         )
         inputs.pop("token_type_ids", None)
-        return inputs.to(self.net.device)
+        return self._inputs_to_device(inputs)
 
     @staticmethod
     def _content_parts(content) -> List[dict]:
@@ -149,7 +93,6 @@ class TransformersVLM(Transformers):
         parts = []
         for part in content or []:
             if part.get("type") == "image_url":
-                # transformers templates take urls/base64 data-URIs as "image".
                 parts.append({"type": "image", "image": part["image_url"]["url"]})
             else:
                 parts.append(part)
@@ -165,22 +108,24 @@ class TransformersVLM(Transformers):
             {"role": message["role"], "content": self._content_parts(message.get("content"))}
             for message in self._normalize_messages(messages)
         ]
-
-        pil_images = [to_pil_image(image) for image in images or []]
-        if pil_images:
+        rgb_images = [to_pil_image(image) for image in images or []]
+        if rgb_images:
             last_user = next((m for m in reversed(conversation) if m["role"] == "user"), None)
             if last_user is None:
                 last_user = {"role": "user", "content": []}
                 conversation.append(last_user)
-            last_user["content"][:0] = [{"type": "image", "image": img} for img in pil_images]
+            last_user["content"][:0] = [{"type": "image", "image": img} for img in rgb_images]
         return conversation
-
-    # ------------------------------------------------------------------
-    # Embeddings
-    # ------------------------------------------------------------------
 
     def embed(self, text: Optional[str] = None, image=None, instruction: Optional[str] = None) -> List[float]:
         """One L2-normalized embedding vector for a text and/or image input."""
+        if getattr(self, "processor", None) is None:
+            if image is not None:
+                raise ValueError(f"{self.weights.ref} does not accept image embeddings.")
+            if not text:
+                raise ValueError("embed() needs a text input.")
+            return self.embed_text(text)
+
         import torch
 
         content = []
@@ -199,10 +144,9 @@ class TransformersVLM(Transformers):
             conversation, tokenize=True, add_generation_prompt=True, return_dict=True, return_tensors="pt",
         )
         inputs.pop("token_type_ids", None)
-        inputs = inputs.to(self.net.device)
+        inputs = self._inputs_to_device(inputs)
 
         with torch.no_grad():
             hidden = self.net(**inputs, output_hidden_states=True).hidden_states[-1]
-        # Single unpadded sequence: the last position is the last real token.
         vector = torch.nn.functional.normalize(hidden[0, -1], p=2, dim=-1)
         return vector.float().cpu().tolist()

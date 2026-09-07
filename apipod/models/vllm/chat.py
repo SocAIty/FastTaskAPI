@@ -237,7 +237,7 @@ class VLLMChat(Model):
     the transformers last-token recipe.
     """
 
-    def __init__(self, weights: Union[IncludeHandle, str], *, enable_thinking: bool = False):
+    def __init__(self, weights: Union[IncludeHandle, str], *, enable_thinking: Optional[bool] = None):
         if isinstance(weights, str):
             weights = include_hf(weights)
         if weights.kind != "hf":
@@ -265,8 +265,8 @@ class VLLMChat(Model):
         host = vllm_config.HOST
         port = vllm_config.PORT
         detected = max_model_len_from_config(self.weights)
-        max_len = str(detected) if detected else (vllm_config.MAX_MODEL_LEN or "")
-        max_num_seqs = vllm_config.MAX_NUM_SEQS or "256"
+        explicit_len = vllm_config.MAX_MODEL_LEN.strip()
+        max_num_seqs = vllm_config.MAX_NUM_SEQS.strip()
         extra = vllm_config.EXTRA_ARGS.strip()
         timeout = vllm_config.STARTUP_TIMEOUT
         argv = [
@@ -274,9 +274,10 @@ class VLLMChat(Model):
             "--host", host,
             "--port", str(port),
         ]
-        if max_len:
-            argv.extend(["--max-model-len", max_len])
-        argv.extend(["--max-num-seqs", str(max_num_seqs)])
+        if explicit_len:
+            argv.extend(["--max-model-len", explicit_len])
+        if max_num_seqs:
+            argv.extend(["--max-num-seqs", max_num_seqs])
         if vllm_config.ENABLE_AUTO_TOOL_CHOICE and vllm_config.TOOL_CALL_PARSER:
             argv.extend(["--enable-auto-tool-choice", "--tool-call-parser", vllm_config.TOOL_CALL_PARSER])
         elif vllm_config.TOOL_CALL_PARSER:
@@ -293,7 +294,9 @@ class VLLMChat(Model):
         print(
             f"[apipod] Starting vLLM model={self.weights.ref} "
             f"endpoint=http://{host}:{port} mode={mode} "
-            f"max_model_len={max_len or 'vllm-default'} max_num_seqs={max_num_seqs}",
+            f"detected_max_model_len={detected or 'unknown'} "
+            f"max_model_len={explicit_len or 'vllm-default'} "
+            f"max_num_seqs={max_num_seqs or 'vllm-default'}",
             flush=True,
         )
         print(f"[apipod] vLLM command: {command}", flush=True)
@@ -427,7 +430,7 @@ class VLLMChat(Model):
         messages,
         images=None,
         temperature: float = 0.7,
-        max_tokens: int = 512,
+        max_tokens: Optional[int] = None,
         top_p: float = 1.0,
         stop=None,
         seed=None,
@@ -442,11 +445,13 @@ class VLLMChat(Model):
             "model": str(self.weights.ref),
             "messages": self._openai_messages(messages, images),
             "temperature": temperature,
-            "max_tokens": max_tokens,
             "top_p": top_p,
             "stream": stream,
-            "chat_template_kwargs": {"enable_thinking": self.enable_thinking},
         }
+        if self.enable_thinking is not None:
+            body["chat_template_kwargs"] = {"enable_thinking": self.enable_thinking}
+        if max_tokens is not None:
+            body["max_tokens"] = max_tokens
         if stop:
             body["stop"] = [stop] if isinstance(stop, str) else list(stop)
         if seed is not None:
@@ -480,7 +485,7 @@ class VLLMChat(Model):
     def _completion_url(self) -> str:
         return f"{self._base_url}/v1/chat/completions"
 
-    def _result_from_openai(self, payload: dict, max_tokens: int):
+    def _result_from_openai(self, payload: dict, max_tokens: Optional[int]):
         choice = (payload.get("choices") or [{}])[0]
         message = choice.get("message") or {}
         text = message.get("content") or ""
@@ -523,7 +528,7 @@ class VLLMChat(Model):
             return parsed["content"]
         if parsed.get("tool_calls"):
             finish_reason = "tool_calls"
-        elif completion_tokens >= max_tokens:
+        elif max_tokens is not None and completion_tokens >= max_tokens:
             finish_reason = "length"
         else:
             finish_reason = choice.get("finish_reason") or "stop"
@@ -555,7 +560,7 @@ class VLLMChat(Model):
         messages,
         images=None,
         temperature: float = 0.7,
-        max_tokens: int = 512,
+        max_tokens: Optional[int] = None,
         top_p: float = 1.0,
         stop=None,
         seed=None,
@@ -581,7 +586,7 @@ class VLLMChat(Model):
         messages,
         images=None,
         temperature: float = 0.7,
-        max_tokens: int = 512,
+        max_tokens: Optional[int] = None,
         top_p: float = 1.0,
         stop=None,
         seed=None,
@@ -607,7 +612,7 @@ class VLLMChat(Model):
         messages,
         images=None,
         temperature: float = 0.7,
-        max_tokens: int = 512,
+        max_tokens: Optional[int] = None,
         top_p: float = 1.0,
         stop=None,
         seed=None,
@@ -633,7 +638,7 @@ class VLLMChat(Model):
         messages,
         images=None,
         temperature: float = 0.7,
-        max_tokens: int = 512,
+        max_tokens: Optional[int] = None,
         top_p: float = 1.0,
         stop=None,
         seed=None,
