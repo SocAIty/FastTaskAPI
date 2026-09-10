@@ -21,9 +21,9 @@ class Model:
     """Base class for user models. Attach includes in ``__init__``, load them in ``load()``.
 
     Example:
-        class QwenLLM(apipod.Model):
+        class MyLLM(apipod.Model):
             def __init__(self):
-                self.weights = apipod.include_hf("Qwen/Qwen3.5-7B")
+                self.weights = apipod.include_hf("org/model")
 
             def load(self):
                 self.net = AutoModelForCausalLM.from_pretrained(self.weights.path)

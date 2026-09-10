@@ -94,17 +94,15 @@ def transcribe(audio: AudioFile):
 
 ## Model Loading Presets
 
-Declare your weights; APIPod loads them at app start and the platform pre-stages them per provider (RunPod HF cache, image baking). `Chat` is the public chat preset; transformers classes remain for embeddings and custom load logic:
+Declare your weights; APIPod loads them at app start and the platform pre-stages them per provider (RunPod HF cache, image baking). `Chat` is the public chat preset. The transformers adapter is `VLM` (text or vision). Do not subclass vLLM or Transformers.
 
 ```python
 import apipod
 
-chat = apipod.Chat("Qwen/Qwen3.8-27B-FP8")                   # /chat; vLLM if CLI is on PATH, else transformers
-llm = apipod.TransformersLLM("Qwen/Qwen2.5-7B-Instruct")      # chat LLM: generate / stream / embed_text
-vlm = apipod.TransformersVLM("Qwen/Qwen3-VL-8B-Instruct")     # vision-language: image chat / stream / embed
+chat = apipod.Chat("Qwen/Qwen3.8-27B-FP8")
 ```
 
-`Chat` picks the engine for you (`engine=` or `APIPOD_ENGINE=transformers` to force Hugging Face). Transformers presets pick the fastest attention backend on the machine (flash-attn 2 when installed on an Ampere+ GPU, PyTorch SDPA otherwise). The vLLM engine never imports vLLM: it spawns the CLI, waits for `/health`, and proxies OpenAI chat HTTP (set `MAX_CONCURRENCY` so the RunPod worker feeds several jobs into that server). Subclass `apipod.Model` for custom load logic.
+`Chat` picks the engine (`engine=` or `APIPOD_ENGINE=transformers` to force Hugging Face). The transformers `VLM` adapter picks the fastest attention backend on the machine (flash-attn 2 when installed on an Ampere+ GPU, PyTorch SDPA otherwise). The vLLM engine never imports vLLM: it spawns the CLI, waits for `/health`, and proxies OpenAI chat HTTP (set `MAX_CONCURRENCY` so the RunPod worker feeds several jobs into that server). Request `max_tokens` and `enable_thinking` stay unset unless you pass them. Subclass `apipod.Model` for custom load logic.
 
 ## Serve a Model in One Call
 

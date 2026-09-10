@@ -1,12 +1,9 @@
 """Transformers-backed model presets.
 
-``Transformers`` holds what every preset shares (HF include handling, load
-kwargs, chat normalization, token streaming); ``TransformersLLM`` and
-``TransformersVLM`` are the concrete presets for causal chat LLMs and
-vision-language models.
+``Transformers`` holds shared load and generation helpers.
+:class:`VLM` is the concrete preset for text and vision-language checkpoints.
 """
 from apipod.models.transformers.base import Transformers
-from apipod.models.transformers.llm import TransformersLLM
-from apipod.models.transformers.vlm import TransformersVLM
+from apipod.models.transformers.vlm import VLM
 
-__all__ = ["Transformers", "TransformersLLM", "TransformersVLM"]
+__all__ = ["Transformers", "VLM"]

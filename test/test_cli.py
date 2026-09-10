@@ -126,6 +126,68 @@ def test_build_generates_dockerfile(project, monkeypatch):
     assert "FROM" in dockerfile.read_text()
 
 
+def test_chat_kwargs_omit_unset_max_tokens():
+    from apipod.common.schemas import ChatCompletionRequest
+    from apipod.serve import _chat_kwargs
+
+    def generate(self, messages, temperature=0.7, max_tokens=None):
+        return None
+
+    request = ChatCompletionRequest(messages=[{"role": "user", "content": "hi"}])
+    kwargs = _chat_kwargs(request, generate)
+    assert "max_tokens" not in kwargs
+
+    limited = ChatCompletionRequest(messages=[{"role": "user", "content": "hi"}], max_tokens=8)
+    assert _chat_kwargs(limited, generate)["max_tokens"] == 8
+
+
+def test_chat_kwargs_forward_reasoning_effort():
+    from apipod.common.schemas import ChatCompletionRequest
+    from apipod.serve import _chat_kwargs
+
+    def thinking(self, messages, temperature=0.7, max_tokens=None, reasoning_effort=None):
+        return None
+
+    def minimal(self, messages, temperature=0.7, max_tokens=None):
+        return None
+
+    request = ChatCompletionRequest(messages=[{"role": "user", "content": "hi"}], reasoning_effort="low")
+    assert _chat_kwargs(request, thinking)["reasoning_effort"] == "low"
+    assert "reasoning_effort" not in _chat_kwargs(request, minimal)
+
+
+def test_vllm_defaults_are_explicit_overrides():
+    from apipod.models.chat import _unregistered
+    from apipod.models.transformers.base import Transformers
+    from apipod.models.vllm import config as vllm_config
+    from apipod.models.vllm.chat import VLLMChat
+
+    assert vllm_config.MAX_MODEL_LEN == ""
+    assert vllm_config.MAX_NUM_SEQS == ""
+    assert vllm_config.ENABLE_AUTO_TOOL_CHOICE is False
+    assert "max_new_tokens" not in Transformers._generation_kwargs(0.7, None)
+
+    engine = _unregistered(VLLMChat, "org/model")
+    body = engine._request_body([{"role": "user", "content": "hi"}])
+    assert "max_tokens" not in body
+    assert "chat_template_kwargs" not in body
+    assert engine._request_body([{"role": "user", "content": "hi"}], max_tokens=16)["max_tokens"] == 16
+    thinking = _unregistered(VLLMChat, "org/model", enable_thinking=True)
+    assert thinking._request_body([{"role": "user", "content": "hi"}])["chat_template_kwargs"] == {
+        "enable_thinking": True,
+    }
+    off = _unregistered(VLLMChat, "org/model", enable_thinking=False)
+    assert off._request_body(
+        [{"role": "user", "content": "hi"}], reasoning_effort="low"
+    )["chat_template_kwargs"] == {"enable_thinking": True, "reasoning_effort": "low"}
+    assert off._request_body(
+        [{"role": "user", "content": "hi"}], reasoning_effort="high"
+    )["chat_template_kwargs"] == {"enable_thinking": True, "reasoning_effort": "xhigh"}
+    assert off._request_body(
+        [{"role": "user", "content": "hi"}], reasoning_effort="none"
+    )["chat_template_kwargs"] == {"enable_thinking": False}
+
+
 def test_simulate_applies_intent_and_starts(project, monkeypatch):
     started = {}
 

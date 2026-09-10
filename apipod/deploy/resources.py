@@ -44,8 +44,7 @@ _MODEL_VAR_NAMES = frozenset({
 })
 _HF_CALL_NAMES = frozenset({
     "include_hf",
-    "TransformersLLM",
-    "TransformersVLM",
+    "VLM",
     "Transformers",
     "VLLMChat",
     "Chat",

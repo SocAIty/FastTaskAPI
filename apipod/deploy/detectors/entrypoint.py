@@ -9,8 +9,7 @@ _PRIORITY_FILES = ("main.py", "app.py", "api.py", "serve.py")
 _FACTORY_NAMES = frozenset({"APIPod", "serve"})
 _SERVE_INDICATORS = (
     "serve(",
-    "TransformersLLM",
-    "TransformersVLM",
+    "VLM",
     "VLLMChat",
     "Chat(",
 )

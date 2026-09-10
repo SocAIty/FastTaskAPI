@@ -1,7 +1,7 @@
 """Capability-based chat preset. Engine is vLLM or transformers, not the public type.
 
 ``Chat("Qwen/Qwen3.8-27B-FP8")`` picks vLLM when the CLI is on PATH (or when
-``engine="vllm"`` / ``APIPOD_ENGINE=vllm``). Otherwise it uses transformers.
+``engine="vllm"`` / ``APIPOD_ENGINE=vllm``). Otherwise it uses :class:`VLM`.
 ``serve()`` always sees ``generate(..., images=)`` so ``/chat`` accepts images.
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import AsyncIterator, Iterator, Optional, Type, Union
 
 from apipod.models.includes import IncludeHandle
 from apipod.models.model import Model
-from apipod.models.transformers.llm import TransformersLLM
+from apipod.models.transformers.vlm import VLM
 from apipod.models.vllm.chat import VLLMChat
 
 _VALID_ENGINES = ("vllm", "transformers")
@@ -54,15 +54,13 @@ class Chat(Model):
         weights: Union[IncludeHandle, str],
         *,
         engine: Optional[str] = None,
-        enable_thinking: bool = False,
-        transformers_cls: Optional[Type[Model]] = None,
+        enable_thinking: Optional[bool] = None,
     ):
         self.engine_name = _pick_engine(engine)
         if self.engine_name == "vllm":
             self._engine = _unregistered(VLLMChat, weights, enable_thinking=enable_thinking)
         else:
-            cls = transformers_cls or TransformersLLM
-            self._engine = _unregistered(cls, weights)
+            self._engine = _unregistered(VLM, weights, enable_thinking=enable_thinking)
         self.weights = self._engine.weights
 
     def includes(self):
@@ -82,10 +80,7 @@ class Chat(Model):
         if "images" in params:
             kwargs["images"] = images
         elif images:
-            raise ValueError(
-                f"{type(self._engine).__name__} does not accept images. "
-                "Pass transformers_cls=TransformersVLM (or a VLM subclass) for vision models."
-            )
+            raise ValueError(f"{type(self._engine).__name__} does not accept images.")
         accepted = {key: value for key, value in kwargs.items() if key in params}
         return method(messages, **accepted)
 
@@ -94,14 +89,16 @@ class Chat(Model):
         messages,
         images=None,
         temperature: float = 0.7,
-        max_tokens: int = 512,
+        max_tokens: Optional[int] = None,
         top_p: float = 1.0,
         stop=None,
         seed=None,
         tools=None,
         tool_choice=None,
+        parallel_tool_calls=None,
         logprobs: bool = False,
         top_logprobs=None,
+        reasoning_effort: Optional[str] = None,
     ):
         return self._call_engine(
             "generate",
@@ -114,8 +111,10 @@ class Chat(Model):
             seed=seed,
             tools=tools,
             tool_choice=tool_choice,
+            parallel_tool_calls=parallel_tool_calls,
             logprobs=logprobs,
             top_logprobs=top_logprobs,
+            reasoning_effort=reasoning_effort,
         )
 
     async def agenerate(
@@ -123,14 +122,16 @@ class Chat(Model):
         messages,
         images=None,
         temperature: float = 0.7,
-        max_tokens: int = 512,
+        max_tokens: Optional[int] = None,
         top_p: float = 1.0,
         stop=None,
         seed=None,
         tools=None,
         tool_choice=None,
+        parallel_tool_calls=None,
         logprobs: bool = False,
         top_logprobs=None,
+        reasoning_effort: Optional[str] = None,
     ):
         kwargs = dict(
             images=images,
@@ -141,8 +142,10 @@ class Chat(Model):
             seed=seed,
             tools=tools,
             tool_choice=tool_choice,
+            parallel_tool_calls=parallel_tool_calls,
             logprobs=logprobs,
             top_logprobs=top_logprobs,
+            reasoning_effort=reasoning_effort,
         )
         if getattr(type(self._engine), "agenerate", None) is None:
             return self.generate(messages, **kwargs)
@@ -156,12 +159,14 @@ class Chat(Model):
         messages,
         images=None,
         temperature: float = 0.7,
-        max_tokens: int = 512,
+        max_tokens: Optional[int] = None,
         top_p: float = 1.0,
         stop=None,
         seed=None,
         tools=None,
         tool_choice=None,
+        parallel_tool_calls=None,
+        reasoning_effort: Optional[str] = None,
     ) -> Iterator:
         return self._call_engine(
             "stream",
@@ -174,6 +179,8 @@ class Chat(Model):
             seed=seed,
             tools=tools,
             tool_choice=tool_choice,
+            parallel_tool_calls=parallel_tool_calls,
+            reasoning_effort=reasoning_effort,
         )
 
     async def astream(
@@ -181,12 +188,14 @@ class Chat(Model):
         messages,
         images=None,
         temperature: float = 0.7,
-        max_tokens: int = 512,
+        max_tokens: Optional[int] = None,
         top_p: float = 1.0,
         stop=None,
         seed=None,
         tools=None,
         tool_choice=None,
+        parallel_tool_calls=None,
+        reasoning_effort: Optional[str] = None,
     ) -> AsyncIterator:
         kwargs = dict(
             images=images,
@@ -197,6 +206,8 @@ class Chat(Model):
             seed=seed,
             tools=tools,
             tool_choice=tool_choice,
+            parallel_tool_calls=parallel_tool_calls,
+            reasoning_effort=reasoning_effort,
         )
         if getattr(type(self._engine), "astream", None) is None:
             for delta in self.stream(messages, **kwargs):
@@ -205,3 +216,17 @@ class Chat(Model):
         stream = self._call_engine("astream", messages, **kwargs)
         async for delta in stream:
             yield delta
+
+    def embed(self, text=None, image=None, instruction=None):
+        self.ensure_loaded()
+        method = getattr(self._engine, "embed", None)
+        if method is None:
+            raise ValueError(f"{type(self._engine).__name__} does not implement embed.")
+        return method(text=text, image=image, instruction=instruction)
+
+    def embed_text(self, text):
+        self.ensure_loaded()
+        method = getattr(self._engine, "embed_text", None)
+        if method is None:
+            raise ValueError(f"{type(self._engine).__name__} does not implement embed_text.")
+        return method(text)
