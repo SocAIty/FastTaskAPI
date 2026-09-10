@@ -29,16 +29,51 @@ from apipod.models.vllm import config as vllm_config
 _HEALTH_POLL_S = 2.0
 _HTTP_TIMEOUT_S = 3600.0
 _VLLM_LOG_PATH = "/tmp/apipod-vllm.log"
-_FIRST_CLASS_FLAGS = {
+# Schema ChatCompletionRequest uses none|minimal|low|medium|high.
+# Qwen3.8's template only accepts low|medium|xhigh; ``high`` HTTP 500s.
+_QWEN_EFFORT = {
+    "low": "low",
+    "medium": "medium",
+    "high": "xhigh",
+    "xhigh": "xhigh",
+}
+
+
+def thinking_chat_template(
+    *,
+    enable_thinking: Optional[bool] = None,
+    reasoning_effort: Optional[str] = None,
+) -> Optional[dict]:
+    """vLLM ``chat_template_kwargs``. Per-request ``reasoning_effort`` wins."""
+    if reasoning_effort is not None:
+        key = str(reasoning_effort).strip().lower()
+        if key in ("", "none", "minimal"):
+            return {"enable_thinking": False}
+        effort = _QWEN_EFFORT.get(key)
+        if effort is None:
+            raise ValueError(
+                f"Unexpected reasoning_effort {reasoning_effort!r}. "
+                "Use none, minimal, low, medium, or high."
+            )
+        return {"enable_thinking": True, "reasoning_effort": effort}
+    if enable_thinking is not None:
+        return {"enable_thinking": enable_thinking}
+    return None
+
+
+_FIRST_CLASS_VALUE_FLAGS = {
     "--host",
     "--port",
     "--max-model-len",
     "--max-num-seqs",
-    "--enable-auto-tool-choice",
     "--tool-call-parser",
     "--reasoning-parser",
     "--speculative-config",
 }
+_FIRST_CLASS_BOOL_FLAGS = {
+    "--enable-auto-tool-choice",
+}
+_FIRST_CLASS_FLAGS = _FIRST_CLASS_VALUE_FLAGS | _FIRST_CLASS_BOOL_FLAGS
 
 
 def _as_uint8(arr):
@@ -114,7 +149,7 @@ def _extend_without_duplicates(argv: List[str], extra: str) -> None:
     while index < len(tokens):
         token = tokens[index]
         flag = token.split("=")[0] if token.startswith("--") else ""
-        takes_value = flag in _FIRST_CLASS_FLAGS and "=" not in token
+        takes_value = flag in _FIRST_CLASS_VALUE_FLAGS and "=" not in token
         skip_value = takes_value and index + 1 < len(tokens) and not tokens[index + 1].startswith("-")
         if flag in present:
             index += 2 if skip_value else 1
@@ -221,12 +256,110 @@ def _speculative_argv(raw: str) -> List[str]:
     return ["--speculative-config", json.dumps(parsed, separators=(",", ":"))]
 
 
+def vllm_serve_argv(
+    binary: str,
+    model_ref: str,
+    *,
+    host: str,
+    port: int,
+    max_model_len: str = "",
+    max_num_seqs: str = "",
+    enable_auto_tool_choice: bool = False,
+    tool_call_parser: str = "",
+    reasoning_parser: str = "",
+    speculative_config: str = "",
+    extra: str = "",
+) -> list[str]:
+    """Build ``vllm serve`` argv. Does not spawn the process."""
+    argv = [
+        binary, "serve", model_ref,
+        "--host", host,
+        "--port", str(port),
+    ]
+    if max_model_len.strip():
+        argv.extend(["--max-model-len", max_model_len.strip()])
+    if max_num_seqs.strip():
+        argv.extend(["--max-num-seqs", max_num_seqs.strip()])
+    if enable_auto_tool_choice and tool_call_parser.strip():
+        argv.extend(["--enable-auto-tool-choice", "--tool-call-parser", tool_call_parser.strip()])
+    elif tool_call_parser.strip():
+        argv.extend(["--tool-call-parser", tool_call_parser.strip()])
+    if reasoning_parser.strip():
+        argv.extend(["--reasoning-parser", reasoning_parser.strip()])
+    argv.extend(_speculative_argv(speculative_config))
+    if extra.strip():
+        _extend_without_duplicates(argv, extra.strip())
+    return argv
+
+
 class _SseParseState:
     """Streaming parse: native OpenAI deltas win over Hermes tag scraping."""
 
     def __init__(self):
         self.parser = ChatOutputParser()
         self.native_tool_calls = False
+        self.first_kind: Optional[str] = None
+        self.usage: Optional[dict] = None
+        self.logged_usage = False
+        self.t0 = time.monotonic()
+
+
+def _prompt_stats(body: dict) -> str:
+    messages = body.get("messages") or []
+    tools = body.get("tools") or []
+    chars = 0
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        content = message.get("content")
+        if isinstance(content, str):
+            chars += len(content)
+        elif content:
+            chars += len(json.dumps(content, default=str))
+    if tools:
+        chars += len(json.dumps(tools, default=str))
+    thinking = (body.get("chat_template_kwargs") or {}).get("enable_thinking")
+    return (
+        f"messages={len(messages)} tools={len(tools)} chars={chars} "
+        f"thinking={int(bool(thinking))}"
+    )
+
+
+def _cached_tokens(usage: dict) -> Any:
+    details = usage.get("prompt_tokens_details")
+    if isinstance(details, dict) and details.get("cached_tokens") is not None:
+        return details.get("cached_tokens")
+    for key in ("cached_tokens", "num_cached_tokens"):
+        if usage.get(key) is not None:
+            return usage.get(key)
+    return None
+
+
+def _elapsed_ms(state: _SseParseState) -> int:
+    return int((time.monotonic() - state.t0) * 1000)
+
+
+def _log_first_delta(state: _SseParseState, kind: str) -> None:
+    if state.first_kind:
+        return
+    state.first_kind = kind
+    print(
+        f"[apipod] chat first_delta kind={kind} elapsed_ms={_elapsed_ms(state)}",
+        flush=True,
+    )
+
+
+def _log_usage(state: _SseParseState, usage: dict) -> None:
+    if state.logged_usage:
+        return
+    state.logged_usage = True
+    state.usage = usage
+    print(
+        f"[apipod] chat usage prompt_tokens={usage.get('prompt_tokens')} "
+        f"cached_tokens={_cached_tokens(usage)} "
+        f"completion_tokens={usage.get('completion_tokens')}",
+        flush=True,
+    )
 
 
 class VLLMChat(Model):
@@ -269,24 +402,19 @@ class VLLMChat(Model):
         max_num_seqs = vllm_config.MAX_NUM_SEQS.strip()
         extra = vllm_config.EXTRA_ARGS.strip()
         timeout = vllm_config.STARTUP_TIMEOUT
-        argv = [
-            binary, "serve", str(self.weights.ref),
-            "--host", host,
-            "--port", str(port),
-        ]
-        if explicit_len:
-            argv.extend(["--max-model-len", explicit_len])
-        if max_num_seqs:
-            argv.extend(["--max-num-seqs", max_num_seqs])
-        if vllm_config.ENABLE_AUTO_TOOL_CHOICE and vllm_config.TOOL_CALL_PARSER:
-            argv.extend(["--enable-auto-tool-choice", "--tool-call-parser", vllm_config.TOOL_CALL_PARSER])
-        elif vllm_config.TOOL_CALL_PARSER:
-            argv.extend(["--tool-call-parser", vllm_config.TOOL_CALL_PARSER])
-        if vllm_config.REASONING_PARSER:
-            argv.extend(["--reasoning-parser", vllm_config.REASONING_PARSER])
-        argv.extend(_speculative_argv(vllm_config.SPECULATIVE_CONFIG))
-        if extra:
-            _extend_without_duplicates(argv, extra)
+        argv = vllm_serve_argv(
+            binary,
+            str(self.weights.ref),
+            host=host,
+            port=port,
+            max_model_len=explicit_len,
+            max_num_seqs=max_num_seqs,
+            enable_auto_tool_choice=vllm_config.ENABLE_AUTO_TOOL_CHOICE,
+            tool_call_parser=vllm_config.TOOL_CALL_PARSER,
+            reasoning_parser=vllm_config.REASONING_PARSER,
+            speculative_config=vllm_config.SPECULATIVE_CONFIG,
+            extra=extra,
+        )
 
         self._argv = argv
         mode = "speculative" if vllm_config.SPECULATIVE_CONFIG.strip() else "standard"
@@ -440,6 +568,7 @@ class VLLMChat(Model):
         stream: bool = False,
         logprobs: bool = False,
         top_logprobs=None,
+        reasoning_effort: Optional[str] = None,
     ) -> dict:
         body: dict[str, Any] = {
             "model": str(self.weights.ref),
@@ -448,8 +577,14 @@ class VLLMChat(Model):
             "top_p": top_p,
             "stream": stream,
         }
-        if self.enable_thinking is not None:
-            body["chat_template_kwargs"] = {"enable_thinking": self.enable_thinking}
+        template = thinking_chat_template(
+            enable_thinking=self.enable_thinking,
+            reasoning_effort=reasoning_effort,
+        )
+        if template is not None:
+            body["chat_template_kwargs"] = template
+        if stream:
+            body["stream_options"] = {"include_usage": True}
         if max_tokens is not None:
             body["max_tokens"] = max_tokens
         if stop:
@@ -489,7 +624,7 @@ class VLLMChat(Model):
         choice = (payload.get("choices") or [{}])[0]
         message = choice.get("message") or {}
         text = message.get("content") or ""
-        reasoning = message.get("reasoning_content")
+        reasoning = message.get("reasoning_content") or message.get("reasoning")
         native_tools = message.get("tool_calls")
         usage = payload.get("usage") or {}
         prompt_tokens = int(usage.get("prompt_tokens") or 0)
@@ -569,12 +704,14 @@ class VLLMChat(Model):
         parallel_tool_calls=None,
         logprobs: bool = False,
         top_logprobs=None,
+        reasoning_effort: Optional[str] = None,
     ):
         self._ensure_started()
         body = self._request_body(
             messages, images, temperature, max_tokens, top_p, stop, seed,
             tools, tool_choice, parallel_tool_calls, stream=False,
             logprobs=logprobs, top_logprobs=top_logprobs,
+            reasoning_effort=reasoning_effort,
         )
         with httpx.Client(timeout=_HTTP_TIMEOUT_S, trust_env=False) as client:
             response = client.post(self._completion_url(), json=body)
@@ -595,12 +732,14 @@ class VLLMChat(Model):
         parallel_tool_calls=None,
         logprobs: bool = False,
         top_logprobs=None,
+        reasoning_effort: Optional[str] = None,
     ):
         self._ensure_started()
         body = self._request_body(
             messages, images, temperature, max_tokens, top_p, stop, seed,
             tools, tool_choice, parallel_tool_calls, stream=False,
             logprobs=logprobs, top_logprobs=top_logprobs,
+            reasoning_effort=reasoning_effort,
         )
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_S, trust_env=False) as client:
             response = await client.post(self._completion_url(), json=body)
@@ -619,16 +758,23 @@ class VLLMChat(Model):
         tools=None,
         tool_choice=None,
         parallel_tool_calls=None,
+        reasoning_effort: Optional[str] = None,
     ) -> Iterator:
         self._ensure_started()
         body = self._request_body(
             messages, images, temperature, max_tokens, top_p, stop, seed,
             tools, tool_choice, parallel_tool_calls, stream=True,
+            reasoning_effort=reasoning_effort,
         )
+        print(f"[apipod] chat stream start {_prompt_stats(body)}", flush=True)
         state = _SseParseState()
         with httpx.Client(timeout=_HTTP_TIMEOUT_S, trust_env=False) as client:
             with client.stream("POST", self._completion_url(), json=body) as response:
                 self._raise_for_status(response)
+                print(
+                    f"[apipod] chat stream open elapsed_ms={_elapsed_ms(state)}",
+                    flush=True,
+                )
                 for line in response.iter_lines():
                     yield from _parse_sse_delta(line, state)
         yield from state.parser.flush()
@@ -645,16 +791,23 @@ class VLLMChat(Model):
         tools=None,
         tool_choice=None,
         parallel_tool_calls=None,
+        reasoning_effort: Optional[str] = None,
     ) -> AsyncIterator:
         self._ensure_started()
         body = self._request_body(
             messages, images, temperature, max_tokens, top_p, stop, seed,
             tools, tool_choice, parallel_tool_calls, stream=True,
+            reasoning_effort=reasoning_effort,
         )
+        print(f"[apipod] chat stream start {_prompt_stats(body)}", flush=True)
         state = _SseParseState()
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_S, trust_env=False) as client:
             async with client.stream("POST", self._completion_url(), json=body) as response:
                 self._raise_for_status(response)
+                print(
+                    f"[apipod] chat stream open elapsed_ms={_elapsed_ms(state)}",
+                    flush=True,
+                )
                 async for line in response.aiter_lines():
                     for delta in _parse_sse_delta(line, state):
                         yield delta
@@ -679,6 +832,10 @@ def _parse_sse_delta(line: str, state: _SseParseState) -> Iterator:
         data = json.loads(payload)
     except json.JSONDecodeError:
         return
+    usage = data.get("usage")
+    if isinstance(usage, dict) and not state.logged_usage:
+        _log_usage(state, usage)
+        yield {"object": "chat.usage", "usage": usage}
     choice = (data.get("choices") or [{}])[0]
     delta = choice.get("delta") or {}
     typed = {
@@ -686,13 +843,19 @@ def _parse_sse_delta(line: str, state: _SseParseState) -> Iterator:
         for key in ("role", "reasoning_content", "tool_calls", "refusal")
         if delta.get(key) is not None
     }
+    if "reasoning_content" not in typed and delta.get("reasoning"):
+        typed["reasoning_content"] = delta["reasoning"]
     if typed.get("tool_calls"):
         state.native_tool_calls = True
+        _log_first_delta(state, "tool")
+    if typed.get("reasoning_content"):
+        _log_first_delta(state, "reasoning")
     if typed:
         yield typed
     content = delta.get("content")
     if not content:
         return
+    _log_first_delta(state, "content")
     if state.native_tool_calls:
         yield content
         return

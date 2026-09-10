@@ -141,6 +141,7 @@ def _chat_kwargs(request: ChatCompletionRequest, method) -> dict:
         "parallel_tool_calls": request.parallel_tool_calls,
         "logprobs": request.logprobs,
         "top_logprobs": request.top_logprobs,
+        "reasoning_effort": request.reasoning_effort,
     }
     supported = _method_params(method)
     unsupported = [
